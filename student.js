@@ -165,11 +165,11 @@
       h = `<div class="compare"><div class="cmp-col"><h3>第一回合：用${A.cname(cc)}的及格線（${fmt(A.budget(cc, 1))} 元）</h3>${A.receiptTable(cc, G.r1, A.budget(cc, 1))}</div>
         <div class="cmp-col"><h3>第二回合：用每天 3 美元（${C.wbLineTWD} 元）</h3>${A.receiptTable(cc, G.r2, C.wbLineTWD)}</div></div>
         <div class="cmp-q">比一比：哪一次買得比較多？為什麼？</div>`;
-      if (r.anySkip) h += `<div class="reminder">💡 ${esc(C.reminderCard)}</div>`;
+      if (r.unaffordable) h += `<div class="reminder">💡 ${esc(C.reminderCard)}</div>`;
       return h;
     }
     h = `<div class="receipt-view"><h2>🧾 ${round === 1 ? '第一回合' : '第二回合'}收據</h2>${A.receiptTable(cc, rd, budget, { noExtras: !full })}`;
-    if (r.anySkip) h += `<div class="reminder">💡 ${esc(C.reminderCard)}</div>`;
+    if (r.unaffordable) h += `<div class="reminder">💡 ${esc(C.reminderCard)}</div>`;
     h += `<p class="big-p">${full ? '這一回合完成了，請等老師的指令。' : '結帳完成！請等老師的指令。'}</p></div>`;
     return h;
   }
@@ -285,3 +285,4 @@
     else showJoin();
   }).catch(err => { root.innerHTML = `<div class="center-card"><h1>連線失敗</h1><p>${esc(err.message || err)}</p><p>請確認 Firebase 設定與網路。</p></div>`; });
 })();
+
