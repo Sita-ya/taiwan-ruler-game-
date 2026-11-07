@@ -3,7 +3,8 @@
   const C = CONFIG, A = App, $ = A.$, fmt = A.fmt, esc = A.esc;
   const root = $('#app'), projEl = $('#proj');
   let CODE = null, M = null, unsub = null, tab = 'ctrl', projMode = false, exporting = false;
-  let createDraft = { n: 6, cs: C.countryOrder.slice() };
+  let setDraft = null;
+  let createDraft ={ n: 6, cs: C.countryOrder.slice() };
   const DEFAULTS = { 4: ['KE', 'IN', 'JP', 'TW'], 5: ['KE', 'IN', 'JP', 'US', 'TW'], 6: C.countryOrder.slice() };
 
   /* ---------- 密碼 ---------- */
@@ -112,8 +113,6 @@
   }
   function renderCtrl() {
     const s = state(), step = s.step;
-    const busy = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('keep');
-    if (busy) return;
     let h = `<div class="ctrl-top">
       <div class="room-code">房間代碼 <b>${CODE}</b><small>${joinedCount()} / ${nGroups()} 組已加入</small></div>
       <div class="tabs"><button class="tab ${tab === 'ctrl' ? 'on' : ''}" data-act="tab" data-t="ctrl">控制台</button><button class="tab ${tab === 'poster' ? 'on' : ''}" data-act="tab" data-t="poster">海報總覽</button></div>
@@ -137,8 +136,9 @@
     if (step <= 1) {
       let h = '';
       if (step === 0) {
-        h += `<div class="panel mini"><b>本局設定</b>（開始之後不能改）<div class="row">組數：${[4, 5, 6].map(n => `<label class="pill"><input type="radio" class="keep" name="sgc" value="${n}" ${s.groupCount === n ? 'checked' : ''}> ${n} 組</label>`).join('')}</div>
-          <div class="row">國家：${C.countryOrder.map(cc => `<label class="pill"><input type="checkbox" class="keep sc" value="${cc}" ${(s.countries || {})[cc] ? 'checked' : ''}> ${A.flag(cc, 'chip-flag')}${A.cname(cc)}</label>`).join('')} <button class="btn" data-act="applySettings">套用設定</button></div></div>`;
+        const dn = setDraft ? setDraft.n : s.groupCount, dc = setDraft ? setDraft.cs : ccList();
+        h += `<div class="panel mini"><b>本局設定</b>（開始之後不能改；改完要按「套用設定」）<div class="row">組數：${[4, 5, 6].map(n => `<label class="pill"><input type="radio" name="sgc" value="${n}" ${dn === n ? 'checked' : ''}> ${n} 組</label>`).join('')}</div>
+          <div class="row">國家：${C.countryOrder.map(cc => `<label class="pill"><input type="checkbox" class="sc" value="${cc}" ${dc.includes(cc) ? 'checked' : ''}> ${A.flag(cc, 'chip-flag')}${A.cname(cc)}</label>`).join('')} <button class="btn" data-act="applySettings">套用設定</button></div></div>`;
       } else {
         h += `<div class="panel mini"><button class="btn primary big" data-act="draw">🎲 抽籤分配國家</button><div class="assign-list">` +
           gl().map(n => `<label>第 ${n} 組 <select class="keep" data-act="assign" data-n="${n}"><option value="">（未分配）</option>${ccList().map(cc => `<option value="${cc}" ${asg(n) === cc ? 'selected' : ''}>${A.cname(cc)}</option>`).join('')}</select></label>`).join('') + '</div>';
@@ -245,7 +245,8 @@
     const t = e.target;
     if (t.name === 'gc') { createDraft.n = +t.value; createDraft.cs = DEFAULTS[createDraft.n].slice(); $('#needN').textContent = createDraft.n; $('#csBox').innerHTML = csBoxHTML(createDraft); }
     else if (t.classList.contains('cs')) { createDraft.cs = $$('.cs:checked').map(x => x.value); }
-    else if (t.name === 'sgc') { const n = +t.value, d = DEFAULTS[n]; $$('.sc').forEach(x => { x.checked = d.includes(x.value); }); }
+    else if (t.name === 'sgc') { const n = +t.value, d = DEFAULTS[n]; $$('.sc').forEach(x => { x.checked = d.includes(x.value); }); setDraft = { n, cs: d.slice() }; }
+    else if (t.classList.contains('sc')) { setDraft = { n: +($('[name=sgc]:checked') || {}).value, cs: $$('.sc:checked').map(x => x.value) }; }
     else if (t.dataset && t.dataset.act === 'assign') { t.blur(); ST('assign/' + t.dataset.n, t.value || null); }
   });
   const $$ = A.$$;
@@ -278,6 +279,7 @@
       const n = +($('[name=sgc]:checked') || {}).value, cs = $$('.sc:checked').map(x => x.value);
       if (cs.length !== n) return A.toast(`請剛好選 ${n} 個國家`);
       const countries = {}; cs.forEach(k => countries[k] = true);
+      setDraft = null;
       await DB.update(`rooms/${CODE}/state`, { groupCount: n, countries, assign: null });
       return A.toast('已套用設定');
     }
