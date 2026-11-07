@@ -42,6 +42,8 @@
       lines, needsTotal, extras, extrasTotal, total, budget,
       remaining: Math.max(0, budget - total),
       anySkip: lines.some(l => l.state === 'skip'),
+      // 放棄的品項是因為「連最便宜的選項都買不起」（提醒卡只在這種情況顯示）
+      unaffordable: lines.some(l => l.state === 'skip' && Math.min(...l.cat.options.map(o => C.price[cc][o.id])) > budget - needsTotal),
       allDecided: lines.every(l => l.state !== 'none'),
       anyDecided: lines.some(l => l.state !== 'none')
     };
