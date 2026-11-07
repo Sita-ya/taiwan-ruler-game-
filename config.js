@@ -7,11 +7,13 @@
    如果 apiKey 還是 "" ，遊戲會自動進入「本機示範模式」：
    只能在同一台電腦的不同分頁之間測試，不會連到網路。 */
 window.FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  databaseURL: "",
-  projectId: "",
-  appId: ""
+  apiKey: "AIzaSyCkhUWnSMZYszvgCpjhm75LznBtqSbT5Vc",
+  authDomain: "world-ruler-afd42.firebaseapp.com",
+  databaseURL: "https://world-ruler-afd42-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "world-ruler-afd42",
+  storageBucket: "world-ruler-afd42.firebasestorage.app",
+  messagingSenderId: "782953191388",
+  appId: "1:782953191388:web:280e86dd648238febae119"
 };
 
 window.CONFIG = {
