@@ -1,7 +1,10 @@
 /* 資料層：有填 Firebase 設定就用 Firebase；沒填就用「本機示範模式」(localStorage) */
 (function () {
   const cfg = window.FIREBASE_CONFIG || {};
-  const useFirebase = !!(cfg.apiKey && cfg.databaseURL && window.firebase);
+  // 網址加上 ?demo=1 會強制使用本機示範模式（練習用，不會寫進 Firebase）
+  // 投影視窗的 ?local=1 也一樣（單機模式）
+  const forceDemo = /[?&](demo|local)=1\b/.test(location.search);
+  const useFirebase = !forceDemo && !!(cfg.apiKey && cfg.databaseURL && window.firebase);
   const DB = { demo: !useFirebase, uid: null };
 
   if (useFirebase) {
@@ -22,7 +25,7 @@
     DB.uid = uid;
     DB.ready = Promise.resolve(uid);
     const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
-    const save = t => localStorage.setItem(KEY, JSON.stringify(t));
+    let save = t => localStorage.setItem(KEY, JSON.stringify(t));
     const parts = p => p.split('/').filter(Boolean);
     const getIn = (t, ps) => { let n = t; for (const k of ps) { if (n == null || typeof n !== 'object') return null; n = n[k]; } return n === undefined ? null : n; };
     const setIn = (t, ps, v) => {
@@ -36,6 +39,11 @@
     const listeners = new Set();
     const notify = () => { const t = load(); listeners.forEach(l => { const v = getIn(t, l.ps); const s = JSON.stringify(v); if (s !== l.last) { l.last = s; l.cb(v == null ? null : JSON.parse(s)); } }); };
     window.addEventListener('storage', e => { if (e.key === KEY) notify(); });
+    // 同一台電腦的多個視窗（控制台＋投影視窗＋學生分頁）即時同步
+    let bc = null;
+    try { bc = new BroadcastChannel('sgMockDB'); bc.onmessage = () => notify(); } catch (e) {}
+    const save0 = save;
+    save = t => { save0(t); try { bc && bc.postMessage(1); } catch (e) {} };
     DB.get = p => Promise.resolve(getIn(load(), parts(p)));
     DB.set = (p, v) => { const t = setIn(load(), parts(p), v === undefined ? null : JSON.parse(JSON.stringify(v))); save(prune(t)); notify(); return Promise.resolve(); };
     DB.update = (p, o) => { let t = load(); for (const k of Object.keys(o)) t = setIn(t, parts(p + '/' + k), o[k] === undefined ? null : o[k]); save(prune(t)); notify(); return Promise.resolve(); };

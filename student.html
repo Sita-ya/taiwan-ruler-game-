@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="世界的尺">
+<meta name="theme-color" content="#2B2D42">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
 <title>世界的尺：背包客生存挑戰（學生端）</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -10,6 +17,7 @@
 <div id="app"><div class="center-card"><h1>載入中…</h1></div></div>
 <div id="pause" class="overlay hidden"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>
 <div id="frozen" class="overlay hidden soft"><div><div class="big-emoji">🔒</div><h1>老師暫時鎖定了這一組</h1><p>請看老師</p></div></div>
+<div id="fsPrompt" class="overlay fs-overlay hidden"><div id="fsMsg"></div></div>
 <div id="conn" class="conn">●</div>
 <script src="lib/firebase-app-compat.js"></script>
 <script src="lib/firebase-auth-compat.js"></script>

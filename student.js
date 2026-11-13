@@ -1,4 +1,4 @@
-/* 學生端 */
+﻿/* 學生端 */
 (function () {
   const C = CONFIG, A = App, $ = A.$, fmt = A.fmt, esc = A.esc;
   const root = $('#app');
@@ -106,7 +106,57 @@
     root.innerHTML = head + `<div class="stage">${body}</div>`;
     if (st === 7 && cc) A.mountPoster($('#posterBox'), A.posterHTML(cc, N, G), Math.min(window.innerWidth - 40, 640));
     const inp = $('#ans'); if (inp) { inp.value = draft; }
+    updateFs();
   }
+
+  /* ---------- 老師要求的「平板全螢幕」（state/fs） ----------
+     瀏覽器規定：網頁不能自己進入全螢幕，一定要學生在平板上親手點一下。
+     所以老師按下按鈕後，平板蓋上黃色大按鈕，學生點一下才進入。 */
+  let fsFail = false, fsSkipped = false;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  // 不寫死「iPad 不支援」，實際偵測這台裝置能不能網頁全螢幕
+  const fsSupported = () => { const d = document.documentElement; return !!((document.fullscreenEnabled || document.webkitFullscreenEnabled) && (d.requestFullscreen || d.webkitRequestFullscreen)); };
+  const standalone = () => (window.matchMedia && (matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches)) || navigator.standalone === true;
+  // 新 iPad 會偽裝成 Mac，所以要加上觸控點數的判斷
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function updateFs() {
+    if (!S || !G) return;
+    const want = !!S.fs, isFs = !!fsEl() || standalone();
+    if (!want) {
+      fsFail = false; fsSkipped = false;
+      if (fsEl()) { try { const p = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+    }
+    let mode = '';
+    if (want && !isFs && !S.paused) {
+      if (fsSupported() && !fsFail) mode = 'button';
+      else if (isIOS() && !fsSkipped) mode = 'ios';
+      else if (fsFail && !fsSkipped) mode = 'fail';
+    }
+    $('#fsPrompt').classList.toggle('hidden', !mode);
+    const html = mode === 'button'
+      ? '<button class="fs-big" data-act="fsgo">👆 點一下　進入全螢幕</button><p class="fs-sub">老師請大家把畫面放大</p>'
+      : mode === 'ios'
+        ? `<div class="fs-card"><h2>📱 這台 iPad 要從「主畫面」開啟，才不會有網址列</h2>
+            <ol><li>點畫面上方的「分享」圖示（方框加向上箭頭）</li><li>往下找「加入主畫面」→ 右上角「新增」</li><li>回到 iPad 主畫面，點「世界的尺」圖示打開</li><li>輸入老師投影幕上的房間代碼，選回同一個組別</li></ol>
+            <button class="btn primary big" data-act="fsskip">知道了</button></div>`
+        : mode === 'fail'
+          ? '<div class="fs-card"><h2>這台平板沒有進入全螢幕</h2><p>可以再試一次；不行的話先繼續上課就好。</p><button class="btn big" data-act="fsretry">再試一次</button>　<button class="btn primary big" data-act="fsskip">知道了</button></div>'
+          : '';
+    const box = $('#fsMsg');
+    if (box.dataset.mode !== mode) { box.innerHTML = html; box.dataset.mode = mode; }
+    if (G.uid === DB.uid && !!G.fs !== isFs) W('fs', isFs);
+  }
+  function goFullscreen() {
+    const d = document.documentElement;
+    try {
+      const p = d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : d.webkitRequestFullscreen();
+      if (p && p.catch) p.catch(() => { fsFail = true; updateFs(); });
+    } catch (e) { fsFail = true; updateFs(); }
+    // 有些瀏覽器不回應也不報錯：1.5 秒後還沒全螢幕，就改顯示「再試一次」（這只是檢查，不是在這裡要求全螢幕）
+    setTimeout(() => { if (!fsEl()) { fsFail = true; updateFs(); } }, 1500);
+  }
+  document.addEventListener('fullscreenchange', updateFs);
+  document.addEventListener('webkitfullscreenchange', updateFs);
   const wait = (msg, emoji) => `<div class="center-card"><div class="big-emoji">${emoji || '⏳'}</div><h1>${msg}</h1></div>`;
 
   function viewLobby() {
@@ -228,6 +278,9 @@
     if (act === 'code') { const c = (joinDraft || '').trim(); if (!/^\d{4}$/.test(c)) return A.toast('請輸入 4 位數字'); return stepGroups(c); }
     if (act === 'back') return showJoin();
     if (act === 'group') return join(d.code, +d.n);
+    if (act === 'fsskip') { fsSkipped = true; updateFs(); return; }
+    if (act === 'fsretry') { fsFail = false; goFullscreen(); return; }
+    if (act === 'fsgo') { goFullscreen(); return; }   // 必須在點擊當下直接呼叫，不能延後
     if (!S || !G) return;
     if (S.paused || (S.frozen && S.frozen[N])) return;
     const cc = S.assign && S.assign[N];

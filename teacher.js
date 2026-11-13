@@ -84,10 +84,11 @@
   const grp = n => (M.groups && M.groups[n]) || {};
   const asg = n => state().assign && state().assign[n];
   const ccList = () => C.countryOrder.filter(k => state().countries && state().countries[k]);
-  const maxSub = () => gl().filter(n => asg(n)).length + 3;
+  const maxSub = () => Proj.maxSub(M);
   const joinedCount = () => gl().filter(n => grp(n).uid).length;
   const allDone = () => { const s = state().step; return s >= 2 && s <= 5 && gl().every(n => App.status(s, grp(n)) === 'done'); };
-  const leftover = n => { const g = grp(n), cc = asg(n); if (!cc || !g.r1 || !g.r1.checkedOut) return null; const r = A.calcRound(cc, g.r1, A.budget(cc, 1)); return Math.max(0, r.budget - r.needsTotal); };
+  let lastPv = null, lastProj = null;   // 上一次畫的 {step, sub}，用來判斷要不要播動畫
+  const mark = () => ({ step: state().step, sub: state().sub || 0 });
 
   /* 導覽 */
   function next() {
@@ -114,11 +115,14 @@
   function renderCtrl() {
     const s = state(), step = s.step;
     let h = `<div class="ctrl-top">
-      <div class="room-code">房間代碼 <b>${CODE}</b><small>${joinedCount()} / ${nGroups()} 組已加入</small></div>
+      <div class="ctrl-brand"><div class="ctrl-title">🧭 ${esc(C.title)}</div>
+        <div class="room-code">房間代碼 <b>${CODE}</b><small>${joinedCount()} / ${nGroups()} 組已加入</small></div></div>
       <div class="tabs"><button class="tab ${tab === 'ctrl' ? 'on' : ''}" data-act="tab" data-t="ctrl">控制台</button><button class="tab ${tab === 'poster' ? 'on' : ''}" data-act="tab" data-t="poster">海報總覽</button></div>
       <button class="btn pausebtn ${s.paused ? 'on' : ''}" data-act="pause">${s.paused ? '▶ 解除暫停' : '👀 全班暫停'}</button>
-      <button class="btn" data-act="proj">📽 投影模式</button>
-      <button class="btn ghost" data-act="home">← 回首頁</button></div>`;
+      <button class="btn" data-act="projwin" title="開一個只有投影畫面的新視窗，拖到電子白板後按「⛶ 全螢幕」（電腦螢幕設定成「延伸」時使用）">🖥 開啟投影視窗</button>
+      <button class="btn" data-act="proj" title="這個視窗直接切換成投影畫面（電腦螢幕設定成「複製」時使用）">📽 投影模式</button>
+      <button class="btn fsbtn ${s.fs ? 'on' : ''}" data-act="fs" title="學生平板會出現『點一下進入全螢幕』，再按一次關閉">${s.fs ? '📱 平板全螢幕 ✓' : '📱 平板全螢幕'}</button>
+      <button class="btn ghost" data-act="home">← 首頁</button></div>`;
     if (!own()) h += '<div class="banner">👁 這個房間不是用這台電腦／瀏覽器建立的，只能檢視與匯出海報，無法控制。</div>';
     if (tab === 'poster') { root.innerHTML = h + posterTabHTML(); mountThumbs(); return; }
     h += '<div class="ctrl-main"><nav class="steplist">' + C.steps.map((x, i) => `<button class="stepbtn ${i === step ? 'on' : ''} ${i < step ? 'past' : ''}" data-act="jump" data-i="${i}"><b>${i}</b> ${esc(x.title)}</button>`).join('') + '</nav>';
@@ -128,8 +132,19 @@
     h += `<div class="navbtns"><button class="btn big" data-act="prev" ${step === 0 && s.sub === 0 ? 'disabled' : ''}>◀ 上一步</button>
       <button class="btn primary big ${allDone() ? 'pulse' : ''}" data-act="next" ${step === 7 ? 'disabled' : ''}>${allDone() ? '✅ 全部完成　' : ''}${step === 6 && s.sub < maxSub() ? '顯示下一個 ▶' : '下一步 ▶'}</button></div>`;
     h += '<h3>各組狀態</h3><div class="gcards">' + gl().map(groupCard).join('') + '</div>';
-    h += `<p class="muted"><button class="btn ghost" data-act="restart">🔄 重新開始（清空所有組別的作答）</button></p></div></div>`;
+    h += `<p class="muted"><button class="btn ghost" data-act="restart">🔄 重新開始（清空所有組別的作答）</button></p></div>`;
+    h += `<aside class="pv"><div class="pv-label">📽 投影幕目前的畫面 <small>（點一下進入投影模式）</small></div>
+      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE), lastPv)}</div></div></aside></div>`;
+    lastPv = mark();
     root.innerHTML = h;
+    fitPreview();
+  }
+  /* 控制台右側的投影預覽：同一份 1920×1080 畫面縮小顯示 */
+  function fitPreview() {
+    const box = $('#pvBox'); if (!box) return;
+    const w = box.clientWidth;
+    box.style.height = w * 1080 / 1920 + 'px';
+    Proj.fit(box.firstElementChild, w, w * 1080 / 1920);
   }
   function stepControls() {
     const s = state(), step = s.step;
@@ -158,7 +173,7 @@
     const joined = !!g.uid;
     return `<div class="gcard ${st} ${joined ? '' : 'offline'}" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>
       <div class="g-top"><b>第 ${n} 組</b> ${cc ? A.flag(cc, 'chip-flag') + A.cname(cc) : '<span class="muted">未分配</span>'}</div>
-      <div class="g-st"><span class="dot ${joined ? 'on' : ''}"></span>${joined ? '已連線' : '未加入'}　<span class="chip-st ${st}">${st === 'na' ? '—' : App.statusLabel[st]}</span>${s.frozen && s.frozen[n] ? ' 🔒' : ''}</div>
+      <div class="g-st"><span class="dot ${joined ? 'on' : ''}"></span>${joined ? '已連線' : '未加入'}　<span class="chip-st ${st}">${st === 'na' ? '—' : App.statusLabel[st]}</span>${s.frozen && s.frozen[n] ? ' 🔒' : ''}${s.fs && joined ? (g.fs ? ' <span class="fs-ok">⛶ 全螢幕</span>' : ' <span class="fs-no">⚠ 未全螢幕</span>') : ''}</div>
       <div class="g-btns"><button class="btn sm" data-act="kick" data-n="${n}" ${joined ? '' : 'disabled'}>踢出</button>
         <button class="btn sm" data-act="freeze" data-n="${n}">${s.frozen && s.frozen[n] ? '解鎖' : '鎖定'}</button>
         <button class="btn sm" data-act="redo" data-n="${n}" data-r="1">重做第1回合</button><button class="btn sm" data-act="redo" data-n="${n}" data-r="2">重做第2回合</button></div></div>`;
@@ -179,57 +194,30 @@
     exporting = false; renderCtrl();
   }
 
-  /* ---------- 投影模式 ---------- */
-  function qrSVG(url) { try { const q = qrcode(0, 'M'); q.addData(url); q.make(); return q.createSvgTag({ cellSize: 8, margin: 2, scalable: true }); } catch (e) { return ''; } }
+  /* ---------- 投影模式（畫面內容在 projection.js，和投影視窗共用） ---------- */
   function renderProj() {
     if (!M) return;
     projEl.classList.toggle('hidden', !projMode);
     document.body.classList.toggle('proj-on', projMode);
-    if (!projMode) return;
-    const s = state(), step = s.step;
-    let h = '';
-    if (s.paused) h = '<div class="overlay"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>';
-    else if (step === 0) {
-      const url = new URL('student.html?room=' + CODE, location.href).href;
-      h = `<div class="pj pj-lobby"><div class="pj-l"><h1>${C.title}</h1><img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
-        <div class="pj-groups">${gl().map(n => `<div class="pj-g ${grp(n).uid ? 'on' : ''}">第 ${n} 組<br><small>${grp(n).uid ? '已加入 ✓' : '等待中'}</small></div>`).join('')}</div></div>
-        <div class="pj-r"><div class="pj-codelabel">房間代碼</div><div class="pj-code">${CODE}</div><div class="pj-qr">${qrSVG(url)}</div><div class="pj-url">平板開啟 student.html，輸入代碼<br>或掃描 QR code</div></div></div>`;
-    } else if (step === 1) {
-      h = `<div class="pj"><h1 class="pj-h">各組的國家任務</h1><div class="pj-cards">${gl().map(n => asg(n) ? `<div class="pj-card" style="--cc:${C.countries[asg(n)].color}">${A.postcard(asg(n), 'pj-pc')}<div class="pj-cn">${A.flag(asg(n), 'pj-flag')}<b>${A.cname(asg(n))}</b></div><div class="pj-gn">第 ${n} 組</div></div>` : `<div class="pj-card empty"><div class="big-emoji">❓</div><div class="pj-gn">第 ${n} 組</div></div>`).join('')}</div></div>`;
-    } else if (step >= 2 && step <= 5) {
-      h = `<div class="pj"><h1 class="pj-h">步驟 ${step}：${esc(C.steps[step].title)}</h1>${step === 5 ? `<div class="pj-wb">世界銀行：每人每天 3 美元 ≈ <b>${C.wbLineTWD}</b> 元</div>` : ''}
-        <div class="pj-status">${gl().map(n => { const st = App.status(step, grp(n)), cc = asg(n); return `<div class="pj-s ${st}" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>${App.statusLabel[st]}</em></div>`; }).join('')}</div></div>`;
-    } else if (step === 6) h = numberLine();
-    else h = `<div class="pj"><h1 class="pj-h">比較海報完成！</h1><div class="pj-status">${gl().map(n => { const cc = asg(n); return `<div class="pj-s done" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>📄 海報完成</em></div>`; }).join('')}</div><p class="pj-note">下一節課要正式發表，請貼上手寫的「我的大發現」。</p></div>`;
-    projEl.innerHTML = (s.paused ? h : `<div id="pjs">${h}</div>`) + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　Esc 離開</div>';
-    fitProj();
+    if (!projMode) { lastProj = null; return; }
+    projEl.innerHTML = `<div id="pjs" class="pj-stage">${Proj.render(M, Proj.env(CODE), lastProj)}</div>` + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　Esc 離開</div>';
+    lastProj = mark();
+    Proj.fit($('#pjs'));
   }
-  /* 投影畫面以 1920×1080 設計，依視窗大小等比縮放 */
-  function fitProj() {
-    const el = $('#pjs'); if (!el || !innerWidth) return;
-    const sc = Math.min(innerWidth / 1920, innerHeight / 1080);
-    el.style.transform = `scale(${sc})`;
-    el.style.left = (innerWidth - 1920 * sc) / 2 + 'px';
-    el.style.top = (innerHeight - 1080 * sc) / 2 + 'px';
-  }
-  window.addEventListener('resize', fitProj);
-  function numberLine() {
-    const s = state(), sub = s.sub;
-    const items = gl().filter(asg).map(n => ({ n, cc: asg(n), v: C.countries[asg(n)].daily })).sort((a, b) => a.v - b.v);
-    const k = items.length, MIN = 10, MAX = 2000;
-    const pos = v => (Math.log(v) - Math.log(MIN)) / (Math.log(MAX) - Math.log(MIN)) * 100;
-    const ticks = [10, 20, 50, 100, 200, 500, 1000, 2000];
-    let h = `<div class="pj nl"><h1 class="pj-h">數字排排站　<small>各國的「及格線」，一天多少元台幣</small></h1><div class="nl-area"><div class="nl-axis"></div>`;
-    ticks.forEach(t => { h += `<div class="nl-tick" style="left:${pos(t)}%"><i></i><span>${fmt(t)}</span></div>`; });
-    items.forEach((it, i) => {
-      const show = sub > i, up = i % 2 === 0, lo = leftover(it.n);
-      h += `<div class="nl-item ${up ? 'up' : 'down'} ${show ? 'in' : ''}" style="left:${pos(it.v)}%;--cc:${C.countries[it.cc].color}"><div class="nl-card">${A.flag(it.cc, 'nl-flag')}<b>${A.cname(it.cc)}</b><span>一天 ${fmt(it.v)} 元</span>
-        ${sub >= k + 3 ? `<em class="left">第一回合買完必需品後<br>還剩 <b>${lo == null ? '—' : fmt(lo)}</b> 元</em>` : ''}</div><div class="nl-stem"></div></div>`;
-    });
-    h += `<div class="nl-wb ${sub >= k + 1 ? 'in' : ''}" style="left:${pos(C.wbLineTWD)}%"><span>世界銀行：每天 3 美元 ≈ ${C.wbLineTWD} 元</span></div></div>
-      <div class="nl-note">數線前段放大（越往右，每一格代表的金額越大），標籤寫的是實際金額</div>
-      <div class="nl-q ${sub >= k + 2 ? 'in' : ''}">為什麼日本、美國的貧窮線比肯亞高好幾倍，在當地生活的人依然很辛苦？</div></div>`;
-    return h;
+  const refit = () => { Proj.fit($('#pjs')); fitPreview(); };
+  window.addEventListener('resize', refit);
+  document.addEventListener('visibilitychange', refit);
+  try { new ResizeObserver(refit).observe(document.documentElement); } catch (e) {}
+  document.addEventListener('fullscreenchange', refit);
+  document.addEventListener('webkitfullscreenchange', refit);
+
+  /* 獨立投影視窗：固定視窗名稱，重複按只會叫回同一個視窗 */
+  function openProjector() {
+    const url = new URL('projector.html?room=' + CODE + (DB.demo ? '&local=1' : ''), location.href).href;
+    const w = window.open(url, 'sg_projector', 'popup,width=1280,height=760');
+    if (!w) return A.alert('瀏覽器擋下了新視窗：請在網址列右邊允許「彈出式視窗」後再按一次。');
+    try { w.focus(); } catch (e) {}
+    A.toast('已開啟投影視窗：把它拖到電子白板，再按視窗裡的「⛶ 全螢幕」。');
   }
 
   /* ---------- 事件 ---------- */
@@ -264,10 +252,12 @@
     if (act === 'tab') { tab = d.t; return renderCtrl(); }
     if (act === 'home') return showHome();
     if (act === 'proj') { projMode = true; renderAll(); try { document.documentElement.requestFullscreen(); } catch (e) {} return; }
+    if (act === 'projwin') return openProjector();
     if (act === 'exportAll') return doExport(gl().filter(asg), `世界的尺_房間${CODE}_全部海報.pdf`);
     if (act === 'exportOne') return doExport([+d.n], `第${d.n}組_${A.cname(asg(+d.n))}_海報.pdf`);
     if (!own()) return A.toast('只能檢視，無法控制這個房間');
     if (act === 'pause') return togglePause();
+    if (act === 'fs') { const on = !state().fs; await ST('fs', on); return A.toast(on ? '學生平板會出現「點一下進入全螢幕」，請學生點一下。' : '已關閉平板全螢幕，學生平板會離開全螢幕。'); }
     if (act === 'next') return next();
     if (act === 'prev') return prev();
     if (act === 'jump') return DB.update(`rooms/${CODE}/state`, { step: +d.i, sub: +d.i === 6 ? 0 : 0 });

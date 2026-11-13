@@ -1,0 +1,11 @@
+{
+  "name": "世界的尺：背包客生存挑戰",
+  "short_name": "世界的尺",
+  "start_url": "student.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#fff7e8",
+  "theme_color": "#2B2D42",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }]
+}
