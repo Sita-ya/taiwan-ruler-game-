@@ -26,6 +26,8 @@
   // 視窗在背景、被拖到另一個螢幕或剛切回來時，resize 事件不一定會發生，所以多加這兩個保險
   document.addEventListener('visibilitychange', fit);
   try { new ResizeObserver(fit).observe(document.documentElement); } catch (e) {}
+  let lastSize = '';
+  setInterval(() => { const sz = innerWidth + 'x' + innerHeight; if (sz !== lastSize) { lastSize = sz; fit(); } }, 1000);
   fit();
 
   if (!/^\d{4}$/.test(code || '')) { msg('網址缺少房間代碼', '請從教師控制台按「🖥 開啟投影視窗」'); return; }

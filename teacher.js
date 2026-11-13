@@ -138,7 +138,18 @@
     lastPv = mark();
     root.innerHTML = h;
     fitPreview();
+    // 預覽框的寬度一變（視窗縮放、版面換欄），就重新計算縮放比例
+    if (pvRO) { pvRO.disconnect(); const box = $('#pvBox'); if (box) pvRO.observe(box); }
   }
+  let pvRO = null;
+  try { pvRO = new ResizeObserver(() => fitPreview()); } catch (e) {}
+  // 最後一道保險：每秒檢查一次，大小變了就重算（某些瀏覽器縮放、拖到別的螢幕時不會發出事件）
+  let lastSize = '';
+  setInterval(() => {
+    const box = $('#pvBox'), pj = $('#pjs');
+    const sz = (box ? box.clientWidth : 0) + 'x' + innerWidth + 'x' + innerHeight + (pj ? 'p' : '');
+    if (sz !== lastSize) { lastSize = sz; refit(); }
+  }, 1000);
   /* 控制台右側的投影預覽：同一份 1920×1080 畫面縮小顯示 */
   function fitPreview() {
     const box = $('#pvBox'); if (!box) return;
