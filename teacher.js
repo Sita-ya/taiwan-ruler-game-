@@ -88,21 +88,23 @@
   const joinedCount = () => gl().filter(n => grp(n).uid).length;
   const allDone = () => { const s = state().step; return s >= 2 && s <= 5 && gl().every(n => App.status(s, grp(n)) === 'done'); };
   let lastPv = null, lastProj = null;   // 上一次畫的 {step, sub}，用來判斷要不要播動畫
-  const mark = () => ({ step: state().step, sub: state().sub || 0 });
+  const mark = () => ({ step: state().step, sub: state().sub || 0, spot: state().spot && state().step >= 3 ? +state().spot : 0 });
 
   /* 導覽 */
   function next() {
     const s = state();
+    if (s.spot) return ST('spot', null);   // 正在放大某組明細時，先收起放大，不換頁
     if (s.step === 6 && s.sub < maxSub()) return ST('sub', s.sub + 1);
     if (s.step >= 7) return;
     if (s.step === 1 && !gl().every(n => asg(n))) return A.toast('還有組別沒有分到國家，請先抽籤');
-    return DB.update(`rooms/${CODE}/state`, { step: s.step + 1, sub: 0 });
+    return DB.update(`rooms/${CODE}/state`, { step: s.step + 1, sub: 0, spot: null });
   }
   function prev() {
     const s = state();
+    if (s.spot) return ST('spot', null);
     if (s.step === 6 && s.sub > 0) return ST('sub', s.sub - 1);
     if (s.step <= 0) return;
-    return DB.update(`rooms/${CODE}/state`, { step: s.step - 1, sub: s.step - 1 === 6 ? maxSub() : 0 });
+    return DB.update(`rooms/${CODE}/state`, { step: s.step - 1, sub: s.step - 1 === 6 ? maxSub() : 0, spot: null });
   }
   const togglePause = () => ST('paused', !state().paused);
 
@@ -158,6 +160,20 @@
     Proj.fit(box.firstElementChild, w, w * 1080 / 1920);
   }
   function stepControls() {
+    return stepControlsBase() + (state().step >= 3 ? spotPanel() : '');
+  }
+  /* 上台發表：點一組，投影幕放大這一組的明細表 */
+  function spotPanel() {
+    const s = state(), cur = +s.spot || 0;
+    const btns = gl().filter(asg).map(n => {
+      const cc = asg(n), g = grp(n), r1 = A.calcRound(cc, g.r1, A.budget(cc, 1)), r2 = A.calcRound(cc, g.r2, A.budget(cc, 2));
+      const info = s.step >= 5 ? `第一回合剩 ${fmt(r1.remaining)}／第二回合剩 ${fmt(r2.remaining)}` : `剩 ${fmt(r1.remaining)} 元`;
+      return `<button class="btn spotbtn ${cur === n ? 'on' : ''}" data-act="spot" data-n="${n}" style="--cc:${C.countries[cc].color}">${A.flag(cc, 'chip-flag')}第 ${n} 組 ${A.cname(cc)}<small>${(g.r1 || {}).checkedOut ? info : '還沒結帳'}</small></button>`;
+    }).join('');
+    return `<div class="panel mini spot-panel"><b>📣 上台發表</b>：點一組，投影幕就放大這一組的明細表（再點一次或按「收起」回到全班清單）
+      <div class="spot-btns">${btns}<button class="btn ghost" data-act="spot" data-n="0" ${cur ? '' : 'disabled'}>✖ 收起放大</button></div></div>`;
+  }
+  function stepControlsBase() {
     const s = state(), step = s.step;
     if (step <= 1) {
       let h = '';
@@ -211,7 +227,7 @@
     projEl.classList.toggle('hidden', !projMode);
     document.body.classList.toggle('proj-on', projMode);
     if (!projMode) { lastProj = null; return; }
-    projEl.innerHTML = `<div id="pjs" class="pj-stage">${Proj.render(M, Proj.env(CODE), lastProj)}</div>` + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　Esc 離開</div>';
+    projEl.innerHTML = `<div id="pjs" class="pj-stage">${Proj.render(M, Proj.env(CODE), lastProj)}</div>` + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　數字鍵 1～6 上台發表、0 收起　Esc 離開</div>';
     lastProj = mark();
     Proj.fit($('#pjs'));
   }
@@ -238,6 +254,7 @@
     if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
     else if (e.key === 'p' || e.key === 'P') togglePause();
+    else if (/^[0-9]$/.test(e.key) && state().step >= 3) { const n = +e.key; if (!n) ST('spot', null); else if (asg(n)) ST('spot', +state().spot === n ? null : n); }
     else if (e.key === 'Escape') { projMode = false; if (document.fullscreenElement) document.exitFullscreen(); renderAll(); }
   });
   document.addEventListener('change', e => {
@@ -271,7 +288,8 @@
     if (act === 'fs') { const on = !state().fs; await ST('fs', on); return A.toast(on ? '學生平板會出現「點一下進入全螢幕」，請學生點一下。' : '已關閉平板全螢幕，學生平板會離開全螢幕。'); }
     if (act === 'next') return next();
     if (act === 'prev') return prev();
-    if (act === 'jump') return DB.update(`rooms/${CODE}/state`, { step: +d.i, sub: +d.i === 6 ? 0 : 0 });
+    if (act === 'jump') return DB.update(`rooms/${CODE}/state`, { step: +d.i, sub: 0, spot: null });
+    if (act === 'spot') { const n = +d.n; return ST('spot', !n || +state().spot === n ? null : n); }
     if (act === 'draw') {
       const list = ccList().slice(); for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
       const a = {}; gl().forEach((n, i) => a[n] = list[i]); return ST('assign', a);

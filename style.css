@@ -288,3 +288,42 @@ body.projector #pjs{position:absolute}
 .pj-msg{display:flex;align-items:center;justify-content:center;text-align:center}.pj-msg h1{font-size:72px}.pj-msg p{font-size:36px;color:#666}
 .pj-fsbtn{position:fixed;right:18px;bottom:16px;z-index:10;font-size:20px;font-weight:700;padding:10px 18px;border-radius:14px;border:2px solid #fff;background:rgba(43,45,66,.55);color:#fff;opacity:.35;transition:opacity .2s;cursor:pointer}
 .pj-fsbtn:hover{opacity:1}
+/* ===== 投影：各組採買清單大集合（步驟 3～5） ===== */
+.cl{padding:22px 36px}
+.cl-h{font-size:46px;margin-bottom:14px}
+.cl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.cl-grid.two{grid-template-columns:repeat(2,1fr)}
+.cl-card{background:#fff;border:5px solid var(--cc);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;min-height:420px}
+.cl-grid.two .cl-card{min-height:440px}
+.cl-head{display:flex;align-items:center;gap:12px;background:var(--cc);color:#fff;padding:8px 16px;font-size:28px}
+.cl-head b{flex:1}.cl-head span{font-size:22px;opacity:.95}
+.cl-flag{width:52px;height:39px}
+.cl-lines{list-style:none;margin:0;padding:8px 16px 0}
+.cl-lines li{display:flex;justify-content:space-between;gap:10px;font-size:24px;padding:4px 0;border-bottom:1px dotted #d8ceb4}
+.cl-lines li b{font-variant-numeric:tabular-nums}
+.cl-lines li.skip{color:#aaa}
+.cl-extra{padding:6px 16px;font-size:24px;color:#555}
+.cl-chip{font-size:30px;margin-right:6px;white-space:nowrap}
+.cl-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:#fff3c4;font-size:20px}
+.cl-left{font-size:24px;font-weight:700}.cl-left b{font-size:40px;color:#D7263D}
+.cl-left.zero b{color:#888}
+.cl-wait{flex:1;display:flex;align-items:center;justify-content:center;font-size:36px;color:#999;min-height:200px}
+
+/* ===== 投影：上台發表（放大某一組） ===== */
+.sp{padding:22px 40px}
+.sp-head{background:var(--cc);color:#fff;border-radius:22px;padding:10px 26px;font-size:46px;font-weight:900;display:flex;align-items:center;gap:16px}
+.sp-flag{width:84px;height:63px}
+.sp-cols{display:grid;grid-template-columns:minmax(0,900px);justify-content:center;gap:30px;margin-top:18px}
+.sp-cols.two{grid-template-columns:1fr 1fr}
+.sp-col h2{font-size:30px;margin:0 0 8px;color:var(--cc)}
+.sp .rcpt{font-size:27px;border-width:3px}
+.sp .rcpt td,.sp .rcpt th{padding:5px 14px}
+.sp-q{text-align:center;font-size:36px;font-weight:700;background:#fff3c4;border-radius:18px;padding:8px;margin-top:14px}
+.pj-pausebadge{position:absolute;right:24px;bottom:18px;background:#1d2b53;color:#fff;border-radius:16px;padding:8px 20px;font-size:28px;font-weight:700;z-index:5}
+
+/* ===== 控制台：上台發表按鈕 ===== */
+.spot-panel{border-color:#F2C230;background:#fffbea}
+.spot-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.spotbtn{border-left:10px solid var(--cc);font-size:18px;min-height:56px;padding:4px 14px;text-align:left}
+.spotbtn small{display:block;font-size:14px;font-weight:400;color:#666}
+.spotbtn.on{background:var(--cc);color:#fff}.spotbtn.on small{color:#fff}

@@ -20,23 +20,69 @@
     const gl = Array.from({ length: s.groupCount }, (_, i) => i + 1);
     const grp = n => (M.groups && M.groups[n]) || {};
     const asg = n => s.assign && s.assign[n];
-    const enter = prev && prev.step !== step ? 'enter' : '';
-    if (s.paused) return '<div class="pj-paused"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>';
-    if (step === 0) {
-      return `<div class="pj pj-lobby ${enter}"><div class="pj-l"><h1>${esc(C.title)}</h1><img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
-        <div class="pj-groups">${gl.map(n => `<div class="pj-g ${grp(n).uid ? 'on' : ''}">第 ${n} 組<br><small>${grp(n).uid ? '已加入 ✓' : '等待中'}</small></div>`).join('')}</div></div>
-        <div class="pj-r"><div class="pj-codelabel">房間代碼</div><div class="pj-code">${esc(env.code)}</div><div class="pj-qr">${env.qr}</div><div class="pj-url">平板開啟 student.html，輸入代碼<br>或掃描 QR code</div></div></div>`;
+    const spot = s.spot && asg(s.spot) && step >= 3 ? +s.spot : 0;
+    const enter = prev && (prev.step !== step || (prev.spot || 0) !== spot) ? 'enter' : '';
+    // 全班暫停：步驟 0～2 投影幕也蓋上「眼睛看老師」；步驟 3 以後（各組上台分享）投影幕照常顯示，只在角落標示
+    if (s.paused && step < C.projPauseFromStep) return '<div class="pj-paused"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>';
+    const badge = s.paused ? '<div class="pj-pausebadge">⏸ 學生平板暫停中</div>' : '';
+    return body() + badge;
+
+    function body() {
+      if (spot) return spotlight(M, spot, step, enter);
+      if (step === 0) {
+        return `<div class="pj pj-lobby ${enter}"><div class="pj-l"><h1>${esc(C.title)}</h1><img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
+          <div class="pj-groups">${gl.map(n => `<div class="pj-g ${grp(n).uid ? 'on' : ''}">第 ${n} 組<br><small>${grp(n).uid ? '已加入 ✓' : '等待中'}</small></div>`).join('')}</div></div>
+          <div class="pj-r"><div class="pj-codelabel">房間代碼</div><div class="pj-code">${esc(env.code)}</div><div class="pj-qr">${env.qr}</div><div class="pj-url">平板開啟 student.html，輸入代碼<br>或掃描 QR code</div></div></div>`;
+      }
+      if (step === 1) {
+        return `<div class="pj ${enter}"><h1 class="pj-h">各組的國家任務</h1><div class="pj-cards">${gl.map(n => asg(n) ? `<div class="pj-card" style="--cc:${C.countries[asg(n)].color}">${A.postcard(asg(n), 'pj-pc')}<div class="pj-cn">${A.flag(asg(n), 'pj-flag')}<b>${A.cname(asg(n))}</b></div><div class="pj-gn">第 ${n} 組</div></div>` : `<div class="pj-card empty"><div class="big-emoji">❓</div><div class="pj-gn">第 ${n} 組</div></div>`).join('')}</div></div>`;
+      }
+      if (step === 2) {
+        return `<div class="pj ${enter}"><h1 class="pj-h">步驟 2：${esc(C.steps[2].title)}</h1>
+          <div class="pj-status">${gl.map(n => { const st = A.status(step, grp(n)), cc = asg(n); return `<div class="pj-s ${st}" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>${A.statusLabel[st]}</em></div>`; }).join('')}</div></div>`;
+      }
+      if (step >= 3 && step <= 5) return collection(gl, grp, asg, step, enter);
+      if (step === 6) return numberLine(M, gl, grp, asg, prev, enter);
+      return `<div class="pj ${enter}"><h1 class="pj-h">比較海報完成！</h1><div class="pj-status">${gl.map(n => { const cc = asg(n); return `<div class="pj-s done" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>📄 海報完成</em></div>`; }).join('')}</div><p class="pj-note">下一節課要正式發表，請貼上手寫的「我的大發現」。</p></div>`;
     }
-    if (step === 1) {
-      return `<div class="pj ${enter}"><h1 class="pj-h">各組的國家任務</h1><div class="pj-cards">${gl.map(n => asg(n) ? `<div class="pj-card" style="--cc:${C.countries[asg(n)].color}">${A.postcard(asg(n), 'pj-pc')}<div class="pj-cn">${A.flag(asg(n), 'pj-flag')}<b>${A.cname(asg(n))}</b></div><div class="pj-gn">第 ${n} 組</div></div>` : `<div class="pj-card empty"><div class="big-emoji">❓</div><div class="pj-gn">第 ${n} 組</div></div>`).join('')}</div></div>`;
-    }
-    if (step >= 2 && step <= 5) {
-      return `<div class="pj ${enter}"><h1 class="pj-h">步驟 ${step}：${esc(C.steps[step].title)}</h1>${step === 5 ? `<div class="pj-wb">世界銀行：每人每天 3 美元 ≈ <b>${C.wbLineTWD}</b> 元</div>` : ''}
-        <div class="pj-status">${gl.map(n => { const st = A.status(step, grp(n)), cc = asg(n); return `<div class="pj-s ${st}" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>${A.statusLabel[st]}</em></div>`; }).join('')}</div></div>`;
-    }
-    if (step === 6) return numberLine(M, gl, grp, asg, prev, enter);
-    return `<div class="pj ${enter}"><h1 class="pj-h">比較海報完成！</h1><div class="pj-status">${gl.map(n => { const cc = asg(n); return `<div class="pj-s done" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>📄 海報完成</em></div>`; }).join('')}</div><p class="pj-note">下一節課要正式發表，請貼上手寫的「我的大發現」。</p></div>`;
   };
+
+  /* 各組採買清單大集合：步驟 3、4 顯示第一回合，步驟 5 顯示第二回合 */
+  function collection(gl, grp, asg, step, enter) {
+    const round = step === 5 ? 2 : 1;
+    const title = step === 3 ? '第一回合：各組的採買清單'
+      : step === 4 ? '第一回合＋當地商店：各組買到的東西'
+        : `第二回合（每天 3 美元 ≈ ${C.wbLineTWD} 元）：各組的採買清單`;
+    const list = gl.filter(asg);
+    const cards = list.map(n => {
+      const cc = asg(n), c = C.countries[cc], g = grp(n), rd = g['r' + round] || {};
+      const budget = A.budget(cc, round), r = A.calcRound(cc, rd, budget);
+      let inner;
+      if (!rd.checkedOut) inner = '<div class="cl-wait">🛒 採買中…</div>';
+      else {
+        inner = '<ul class="cl-lines">' + r.lines.map(l => l.state === 'buy'
+          ? `<li><span>${l.cat.icon} ${l.cat.name}：${esc(l.opt.name)}</span><b>${fmt(l.price)}</b></li>`
+          : `<li class="skip"><span>${l.cat.icon} ${l.cat.name}：✗ 買不起／放棄</span><b></b></li>`).join('') + '</ul>';
+        if (step >= 4) {
+          const ex = r.extras.map(e => `<span class="cl-chip">${e.item.icon}${e.qty > 1 ? '×' + e.qty : ''}</span>`).join('');
+          inner += `<div class="cl-extra">＋ ${ex || (rd.storeDone ? '沒有多的錢買其他東西' : '當地商店選購中…')}</div>`;
+        }
+        inner += `<div class="cl-foot"><span>必需品 ${fmt(r.needsTotal)} 元${r.extrasTotal ? `＋額外 ${fmt(r.extrasTotal)} 元` : ''}</span><span class="cl-left ${r.remaining <= 0 ? 'zero' : ''}">剩 <b>${fmt(r.remaining)}</b> 元</span></div>`;
+      }
+      return `<div class="cl-card" style="--cc:${c.color}"><div class="cl-head">${A.flag(cc, 'cl-flag')}<b>第 ${n} 組・${c.name}</b><span>預算 ${fmt(budget)} 元</span></div>${inner}</div>`;
+    }).join('');
+    return `<div class="pj cl ${enter}"><h1 class="pj-h cl-h">${title}</h1><div class="cl-grid ${list.length <= 4 ? 'two' : ''}">${cards}</div></div>`;
+  }
+
+  /* 上台發表：把某一組的明細表放大 */
+  function spotlight(M, n, step, enter) {
+    const cc = M.state.assign[n], c = C.countries[cc], g = (M.groups && M.groups[n]) || {};
+    const r1 = g.r1 || {};
+    const col1 = `<div class="sp-col"><h2>第一回合：用${c.name}的及格線（${fmt(c.daily)} 元）</h2>${r1.checkedOut ? A.receiptTable(cc, r1, c.daily, { noExtras: step === 3 && !r1.storeDone }) : '<div class="cl-wait">還沒結帳</div>'}</div>`;
+    const col2 = step >= 5 ? `<div class="sp-col"><h2>第二回合：用每天 3 美元（${C.wbLineTWD} 元）</h2>${(g.r2 || {}).checkedOut ? A.receiptTable(cc, g.r2, C.wbLineTWD) : '<div class="cl-wait">還沒結帳</div>'}</div>` : '';
+    return `<div class="pj sp ${enter}" style="--cc:${c.color}"><div class="sp-head">📣 第 ${n} 組上台發表　${A.flag(cc, 'sp-flag')}<b>${c.name}</b></div>
+      <div class="sp-cols ${col2 ? 'two' : ''}">${col1}${col2}</div>${col2 ? '<div class="sp-q">比一比：哪一次買得比較多？為什麼？</div>' : ''}</div>`;
+  }
 
   /* 第一回合買完必需品後還剩多少錢（還沒結帳回傳 null） */
   P.leftover = (cc, g) => {
