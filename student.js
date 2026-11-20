@@ -93,7 +93,7 @@
     $('#pause').classList.toggle('hidden', !S.paused);
     $('#frozen').classList.toggle('hidden', !(S.frozen && S.frozen[N]) || S.paused);
     if (cc) A.setTitleFlagColor(cc);
-    const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)}</div></div>`;
+    const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)} <button class="tb-leave" data-act="leave">換房間</button></div></div>`;
     let body = '';
     const st = S.step;
     if (st === 0) body = viewLobby();
@@ -276,7 +276,16 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const d = b.dataset, act = d.act;
     if (act === 'code') { const c = (joinDraft || '').trim(); if (!/^\d{4}$/.test(c)) return A.toast('請輸入 4 位數字'); return stepGroups(c); }
-    if (act === 'back') return showJoin();
+    if (act === 'back') { joinDraft = ''; return showJoin(); }
+    if (act === 'leave') {
+      if (!R || !(await A.confirm(`要離開房間 ${esc(R)} 的第 ${N} 組，換到別的房間嗎？<br><small>這一組的進度會留在雲端，之後選回同一組就能接續。</small>`, '離開', '取消'))) return;
+      const room = R, n = N;
+      unsub(); ses.clear();
+      try { await DB.set(`rooms/${room}/groups/${n}/uid`, null); } catch (e) {}   // 放開這一組，讓之後可以重新加入
+      joinDraft = '';
+      if (history.replaceState) history.replaceState(null, '', location.pathname + (DB.demo ? '?demo=1' : ''));
+      return showJoin();
+    }
     if (act === 'group') return join(d.code, +d.n);
     if (act === 'fsskip') { fsSkipped = true; updateFs(); return; }
     if (act === 'fsretry') { fsFail = false; goFullscreen(); return; }
@@ -334,7 +343,15 @@
   /* ---------- 啟動 ---------- */
   DB.ready.then(() => {
     const s = ses.get();
-    if (s && s.room && s.group) start(s.room, s.group);
+    const urlRoom = (new URLSearchParams(location.search).get('room') || '').trim();
+    // 網址（掃 QR code）帶了別的房間代碼 → 以網址為準，不要自動回到上次的房間
+    if (s && s.room && s.group && (!/^\d{4}$/.test(urlRoom) || urlRoom === String(s.room))) start(s.room, s.group);
+    else if (/^\d{4}$/.test(urlRoom)) {
+      if (s && s.room && s.group) {   // 放開舊房間裡這台裝置佔用的組別
+        DB.get(`rooms/${s.room}/groups/${s.group}/uid`).then(u => { if (u === DB.uid) DB.set(`rooms/${s.room}/groups/${s.group}/uid`, null); }).catch(() => {});
+      }
+      ses.clear(); joinDraft = urlRoom; stepGroups(urlRoom);
+    }
     else showJoin();
   }).catch(err => { root.innerHTML = `<div class="center-card"><h1>連線失敗</h1><p>${esc(err.message || err)}</p><p>請確認 Firebase 設定與網路。</p></div>`; });
 })();
