@@ -241,10 +241,12 @@ body.teacher{-webkit-user-select:auto;user-select:auto}
 .pj-codelabel{font-size:34px}.pj-code{font-size:150px;font-weight:900;letter-spacing:14px;line-height:1;color:#3A86C8}
 .pj-qr{width:300px;height:300px;margin:12px auto;background:#fff;padding:6px;border-radius:16px}.pj-qr svg{width:100%;height:100%}
 .pj-url{font-size:22px;color:#555}
-.pj-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.pj-card{background:#fff;border:6px solid var(--cc,#ccc);border-radius:24px;padding:12px;text-align:center}
-.pj-card.empty{border-color:#ccc}
-.pj-cn{font-size:44px;margin-top:8px}.pj-flag{width:64px;height:48px;margin-right:10px}.pj-gn{font-size:28px;color:#666}
+/* 開箱國家任務卡：固定兩排、平均分配高度，6 張卡一定放得進 1080 高的投影畫面 */
+.pj-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:20px;height:900px}
+.pj-card{background:#fff;border:6px solid var(--cc,#ccc);border-radius:24px;padding:12px;text-align:center;display:flex;flex-direction:column;min-height:0}
+.pj-card .pc{aspect-ratio:auto;flex:1;min-height:0;width:100%}
+.pj-card.empty{border-color:#ccc;justify-content:center}
+.pj-cn{font-size:42px;margin-top:6px;line-height:1.25;display:flex;align-items:center;justify-content:center}.pj-flag{width:64px;height:48px;margin-right:10px}.pj-gn{font-size:26px;color:#666;line-height:1.25}
 .pj-status{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:20px}
 .pj-s{background:#fff;border-radius:24px;border:6px solid #ddd;padding:22px;text-align:center;font-size:36px;display:flex;flex-direction:column;align-items:center;gap:6px}
 .pj-s .pj-flag{width:96px;height:72px;margin:0}.pj-s em{font-style:normal;font-size:30px;padding:2px 24px;border-radius:30px;background:#eee}
