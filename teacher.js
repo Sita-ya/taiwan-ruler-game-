@@ -182,6 +182,7 @@
     root.innerHTML = h;
     if (tmrFocus && $('#tmrMin')) $('#tmrMin').focus();
     fitPreview();
+    setTopH();
     scheduleTimerRedraw();
     // 預覽框的寬度一變（視窗縮放、版面換欄），就重新計算縮放比例
     if (pvRO) { pvRO.disconnect(); const box = $('#pvBox'); if (box) pvRO.observe(box); }
@@ -362,7 +363,9 @@
     lastVidProj = Proj.handleVid($('#pjs'), M, lastVidProj);
   }
   let lastVidProj;
-  const refit = () => { Proj.fit($('#pjs')); fitPreview(); };
+  // 上方工具列在平板上可能換成兩行：記下它的高度，讓左右兩欄固定在工具列正下方
+  const setTopH = () => { const t = $('.ctrl-top'); if (t) document.documentElement.style.setProperty('--topH', t.offsetHeight + 'px'); };
+  const refit = () => { Proj.fit($('#pjs')); fitPreview(); setTopH(); };
   window.addEventListener('resize', refit);
   document.addEventListener('visibilitychange', refit);
   try { new ResizeObserver(refit).observe(document.documentElement); } catch (e) {}
