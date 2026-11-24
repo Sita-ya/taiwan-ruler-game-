@@ -280,9 +280,14 @@
   function timerPanel() {
     const t = state().timer, running = A.timerLeft(t) > 0;
     return `<div class="panel mini tmr-panel"><b>⏱ 倒數計時</b>
-      ${running ? `<div class="tmr-now">${A.timerHTML(t, true)}<button class="btn" data-act="timerAdd" data-sec="30">＋30 秒</button><button class="btn" data-act="timerAdd" data-sec="60">＋1 分</button><button class="btn ghost" data-act="timerStop">■ 停止</button></div>`
-        : `<div class="tmr-set">${[0.5, 1, 2, 3, 5].map(m => `<button class="btn" data-act="timer" data-sec="${m * 60}">${m < 1 ? '30 秒' : m + ' 分'}</button>`).join('')}
-          <span class="tmr-custom"><input id="tmrMin" class="mini-input" type="number" min="1" max="60" inputmode="numeric" placeholder="自訂" value="${esc(tmrDraft)}">分 <button class="btn primary" data-act="timerCustom">開始</button></span></div>`}</div>`;
+      ${running ? `<div class="tmr-now">${A.timerHTML(t, true)}${[10, 30, 60].map(s => `<button class="btn" data-act="timerAdd" data-sec="${s}">＋${secLabel(s)}</button>`).join('')}<button class="btn ghost" data-act="timerStop">■ 停止</button></div>`
+        : `<div class="tmr-set">${(C.timerPresets || [10, 20, 30, 45, 60, 90, 120, 180]).map(s => `<button class="btn" data-act="timer" data-sec="${s}">${secLabel(s)}</button>`).join('')}
+          <span class="tmr-custom">自訂 <input id="tmrMin" class="mini-input" type="number" min="1" max="3600" inputmode="numeric" placeholder="秒數" value="${esc(tmrDraft)}">秒 <button class="btn primary" data-act="timerCustom">開始</button></span></div>`}</div>`;
+  }
+  // 秒數 → 按鈕文字：20 → 20 秒、60 → 1 分、90 → 1 分 30 秒
+  function secLabel(s) {
+    const m = Math.floor(s / 60), r = s % 60;
+    return m ? `${m} 分${r ? ` ${r} 秒` : ''}` : `${r} 秒`;
   }
   // 時間到之後自動重畫控制台，讓面板回到「選時間」的樣子
   let tmrRedraw = null, tmrDraft = '';
@@ -416,7 +421,7 @@
     if (act === 'vid') { const cur = state().vid || {}; return ST('vid', { cmd: d.cmd, n: (cur.n || 0) + 1 }); }
     if (act === 'fs') { const on = !state().fs; await ST('fs', on); return A.toast(on ? '學生平板會出現「點一下進入全螢幕」，請學生點一下。' : '已關閉平板全螢幕，學生平板會離開全螢幕。'); }
     if (act === 'timer') return startTimer(+d.sec);
-    if (act === 'timerCustom') { const m = parseFloat(($('#tmrMin') || {}).value); if (!(m > 0 && m <= 60)) return A.toast('請輸入 1～60 分鐘'); return startTimer(Math.round(m * 60)); }
+    if (act === 'timerCustom') { const s = Math.round(parseFloat(($('#tmrMin') || {}).value)); if (!(s >= 1 && s <= 3600)) return A.toast('請輸入 1～3600 秒（例如 20 秒、90 秒）'); return startTimer(s); }
     if (act === 'timerAdd') { const t = state().timer; if (!t || A.timerLeft(t) <= 0) return startTimer(+d.sec); return ST('timer', { end: t.end + d.sec * 1000, sec: (t.sec || 0) + +d.sec }); }
     if (act === 'timerStop') return ST('timer', null);
     if (act === 'next') return next();
