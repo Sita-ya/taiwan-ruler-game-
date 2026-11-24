@@ -134,12 +134,12 @@
     h += `<div class="stepbody"><h2>步驟 ${step}：${esc(C.steps[step].title)}${sid() === 'numberline' ? `　<small>（顯示進度 ${s.sub} / ${maxSub()}）</small>` : ''}${sid() === 'card' ? `　<small>（投影幕：${s.sub ? '世界地圖' : '任務卡'}）</small>` : ''}</h2>
       ${notesHTML(step)}`;
     h += stepControls();
-    h += `<div class="navbtns"><button class="btn big" data-act="prev" ${step === 0 && s.sub === 0 ? 'disabled' : ''}>◀ 上一步</button>
+    const navBtns = `<div class="navbtns"><button class="btn big" data-act="prev" ${step === 0 && s.sub === 0 ? 'disabled' : ''}>◀ 上一步</button>
       <button class="btn primary big ${allDone() ? 'pulse' : ''}" data-act="next" ${step >= A.lastStep() ? 'disabled' : ''}>${allDone() ? '✅ 全部完成　' : ''}${sid() === 'numberline' && s.sub < maxSub() ? '顯示下一個 ▶' : (sid() === 'card' && !s.sub ? '🗺 顯示世界地圖 ▶' : '下一步 ▶')}</button></div>`;
     h += '<h3>各組狀態</h3><div class="gcards">' + gl().map(groupCard).join('') + '</div>';
     h += `<p class="muted"><button class="btn ghost" data-act="restart">🔄 重新開始（清空所有組別的作答）</button></p></div>`;
     h += `<aside class="pv"><div class="pv-label">📽 投影幕目前的畫面 <small>（點一下進入投影模式）</small></div>
-      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE, true), lastPv)}</div></div></aside></div>`;
+      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE, true), lastPv)}</div></div>${navBtns}</aside></div>`;
     lastPv = mark();
     root.innerHTML = h;
     fitPreview();
