@@ -49,14 +49,24 @@
     };
   };
   /* 某組在某個步驟的狀態：todo / doing / done / na */
+  /* 步驟代號工具：程式一律用代號判斷，不寫死步驟編號（插入影片頁等步驟時才不會亂掉） */
+  App.sid = step => (C.steps[step] || {}).id || '';
+  App.sidx = id => C.steps.findIndex(s => s.id === id);
+  App.atOrAfter = (step, id) => { const i = App.sidx(id); return i >= 0 && step >= i; };
+  App.stepKind = step => (C.steps[step] || {}).kind || '';
+  App.lastStep = () => C.steps.length - 1;
+  /* 簡報文字：SL(代號)，找不到回傳空物件；文字先跳脫再把 \n 換成 <br> */
+  App.SL = id => (C.slides && C.slides[id]) || {};
+  App.br = s => App.esc(s).replace(/\n/g, '<br>');
+
   App.status = (step, g) => {
     g = g || {};
-    const r1 = g.r1 || {}, r2 = g.r2 || {}, ans = g.ans || {};
-    if (step === 0 || step === 1) return g.uid ? 'done' : 'todo';
-    if (step === 2) return ans.ok ? 'done' : (ans.tries > 0 ? 'doing' : 'todo');
-    if (step === 3) return r1.checkedOut ? 'done' : (r1.cart ? 'doing' : 'todo');
-    if (step === 4) return r1.storeDone ? 'done' : (r1.checkedOut ? 'doing' : 'todo');
-    if (step === 5) return r2.storeDone ? 'done' : ((r2.started || r2.cart || r2.checkedOut) ? 'doing' : 'todo');
+    const r1 = g.r1 || {}, r2 = g.r2 || {}, ans = g.ans || {}, id = App.sid(step);
+    if (id === 'lobby' || id === 'card') return g.uid ? 'done' : 'todo';
+    if (id === 'search') return ans.ok ? 'done' : (ans.tries > 0 ? 'doing' : 'todo');
+    if (id === 'round1') return r1.checkedOut ? 'done' : (r1.cart ? 'doing' : 'todo');
+    if (id === 'store') return r1.storeDone ? 'done' : (r1.checkedOut ? 'doing' : 'todo');
+    if (id === 'round2') return r2.storeDone ? 'done' : ((r2.started || r2.cart || r2.checkedOut) ? 'doing' : 'todo');
     return 'na';
   };
   App.statusLabel = { todo: '未開始', doing: '進行中', done: '已完成', na: '' };

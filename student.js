@@ -1,4 +1,4 @@
-﻿/* 學生端 */
+/* 學生端 */
 (function () {
   const C = CONFIG, A = App, $ = A.$, fmt = A.fmt, esc = A.esc;
   const root = $('#app');
@@ -95,16 +95,25 @@
     if (cc) A.setTitleFlagColor(cc);
     const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)} <button class="tb-leave" data-act="leave">換房間</button></div></div>`;
     let body = '';
-    const st = S.step;
-    if (st === 0) body = viewLobby();
+    const st = S.step, id = A.sid(st), kind = A.stepKind(st);
+    if (st !== lastStepSeen) { lastStepSeen = st; noticeAt = {}; }   // 換步驟時，通知的倒數重新計算
+    let look = null;   // 不是 null 就顯示「請抬頭看大螢幕」（整頁，沒有任何可以點的東西）
+    if (id === 'lobby') body = viewLobby();
+    else if (kind === 'video') look = '🎬 一起看影片';
+    else if (kind === 'videoSum' || id === 'numberline') look = '';
     else if (!cc) body = wait('等待老師抽籤分配國家…', '⏳');
-    else if (st === 1) body = viewCard(cc);
-    else if (st === 2) body = viewSearch(cc);
-    else if (st >= 3 && st <= 5) body = viewShop(cc, st);
-    else if (st === 6) body = wait('請看大螢幕', '📺');
-    else if (st === 7) body = viewPoster(cc);
+    else if (id === 'card') body = viewCard(cc);
+    else if (id === 'search') {
+      const ans = G.ans || {};
+      if (ans.ok && noticeLeft('search') <= 0) look = `✔ 答對了！一天約 ${fmt(C.countries[cc].daily)} 元，這就是第一回合的預算`;
+      else body = viewSearch(cc);
+    }
+    else if (id === 'round1' || id === 'store' || id === 'round2') body = viewShop(cc, id);
+    else if (id === 'poster') body = viewPoster(cc);
+    else look = '';
+    if (look !== null) { root.innerHTML = lookUpHTML(look); updateFs(); return; }
     root.innerHTML = head + `<div class="stage">${body}</div>`;
-    if (st === 7 && cc) A.mountPoster($('#posterBox'), A.posterHTML(cc, N, G), Math.min(window.innerWidth - 40, 640));
+    if (id === 'poster' && cc) A.mountPoster($('#posterBox'), A.posterHTML(cc, N, G), Math.min(window.innerWidth - 40, 640));
     const inp = $('#ans'); if (inp) { inp.value = draft; }
     updateFs();
   }
@@ -157,6 +166,17 @@
   }
   document.addEventListener('fullscreenchange', updateFs);
   document.addEventListener('webkitfullscreenchange', updateFs);
+  /* 「請抬頭看大螢幕」：深色底、左右看的大眼睛、下方一行小字。整頁沒有任何可以點的東西 */
+  const lookUpHTML = sub => `<div class="lookup"><div class="lookup-eyes">👀</div><h1>請抬頭看大螢幕</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>`;
+  /* 通知類畫面只顯示 studentNoticeSeconds 秒：回傳還剩幾毫秒（第一次呼叫時開始計時，時間到自動重畫） */
+  let noticeAt = {}, lastStepSeen = null, noticeTimer = null;
+  function noticeLeft(key) {
+    const total = (C.studentNoticeSeconds || 10) * 1000;
+    if (!noticeAt[key]) noticeAt[key] = Date.now();
+    const left = total - (Date.now() - noticeAt[key]);
+    if (left > 0) { clearTimeout(noticeTimer); noticeTimer = setTimeout(render, left + 50); }
+    return left;
+  }
   const wait = (msg, emoji) => `<div class="center-card"><div class="big-emoji">${emoji || '⏳'}</div><h1>${msg}</h1></div>`;
 
   function viewLobby() {
@@ -182,7 +202,7 @@
     if (viewCC) h += dataCard(viewCC);
     h += '</div>';
     h += `<div class="answer-bar">${ans.ok
-      ? `<div class="ans-ok">✅ 答對了！我們的國家，一天的及格線大約是 <b>${fmt(mine.daily)}</b> 元台幣。<br><small>這個數字就是第一回合的預算，請等老師的指令。</small></div>`
+      ? `<div class="ans-ok">✅ 答對了！我們的國家，一天的及格線大約是 <b>${fmt(mine.daily)}</b> 元台幣。<br><small>這個數字就是第一回合的預算。</small><div class="notice-bar"><i style="animation-duration:${Math.max(0, noticeLeft('search')) / 1000}s"></i></div></div>`
       : `<label>我們的國家，一天的及格線大約是 <input id="ans" class="ans-input" type="number" inputmode="numeric" min="0" placeholder="＿＿"> 元台幣</label>
          <button class="btn primary" data-act="answer">確認</button>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}`}</div>`;
     return h;
@@ -199,15 +219,15 @@
   }
 
   /* ----- 步驟 3、4、5：採買 ----- */
-  function viewShop(cc, st) {
-    const round = st === 5 ? 2 : 1;
+  function viewShop(cc, id) {
+    const round = id === 'round2' ? 2 : 1;
     const rd = G['r' + round] || {};
     const budget = A.budget(cc, round);
     if (round === 2 && !rd.started && !rd.cart && !rd.checkedOut) {
       return `<div class="center-card intro"><h2>🌍 世界銀行的線</h2><p class="big-p">世界銀行訂的極端貧窮線是<b>每人每天 3 美元</b>。用匯率換算，大約是 <b>${C.wbLineTWD} 元</b>台幣。</p><p class="big-p">現在用這筆錢，在<b>同一個國家</b>再買一次！</p><button class="btn primary big" data-act="startR2">開始採買</button></div>`;
     }
     if (!rd.checkedOut) return needsView(cc, round, rd, budget);
-    if (!rd.storeDone && st >= 4) return storeView(cc, round, rd, budget);
+    if (!rd.storeDone && id !== 'round1') return storeView(cc, round, rd, budget);
     const full = !!rd.storeDone;
     const r = A.calcRound(cc, rd, budget);
     let h = '';
@@ -294,7 +314,7 @@
     if (S.paused || (S.frozen && S.frozen[N])) return;
     const cc = S.assign && S.assign[N];
     if (act === 'view') { viewCC = d.cc; hint = ''; return render(); }
-    if (act === 'answer' && S.step === 2) {
+    if (act === 'answer' && A.sid(S.step) === 'search') {
       const v = parseFloat(draft);
       if (isNaN(v)) return A.toast('請先輸入一個數字');
       const ok = Math.abs(v - C.countries[cc].daily) <= C.tolerance;

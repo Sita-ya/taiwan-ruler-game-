@@ -32,11 +32,15 @@
 
   if (!/^\d{4}$/.test(code || '')) { msg('網址缺少房間代碼', '請從教師控制台按「🖥 開啟投影視窗」'); return; }
   DB.ready.then(() => {
+    let lastVid;   // 遙控指令的 n；undefined＝剛打開頁面，先記住不重播
     DB.on('rooms/' + code, M => {
       if (!M || !M.state) { last = null; return msg('找不到房間 ' + code, '請確認教師控制台已開啟這個房間'); }
-      stage.innerHTML = Proj.render(M, Proj.env(code), last);
-      last = { step: M.state.step, sub: M.state.sub || 0 };
-      fit();
+      if (!Proj.shouldSkip(stage, M, last)) {          // 影片播放中不重畫，只處理遙控指令
+        stage.innerHTML = Proj.render(M, Proj.env(code), last);
+        last = Proj.mark(M);
+        fit();
+      }
+      lastVid = Proj.handleVid(stage, M, lastVid);
     });
   }).catch(err => msg('連線失敗', String(err && err.message || err)));
 })();

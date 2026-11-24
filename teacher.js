@@ -86,25 +86,28 @@
   const ccList = () => C.countryOrder.filter(k => state().countries && state().countries[k]);
   const maxSub = () => Proj.maxSub(M);
   const joinedCount = () => gl().filter(n => grp(n).uid).length;
-  const allDone = () => { const s = state().step; return s >= 2 && s <= 5 && gl().every(n => App.status(s, grp(n)) === 'done'); };
+  const sid = () => A.sid(state().step);
+  const allDone = () => { const s = state().step; return ['search', 'round1', 'store', 'round2'].includes(A.sid(s)) && gl().every(n => App.status(s, grp(n)) === 'done'); };
   let lastPv = null, lastProj = null;   // 上一次畫的 {step, sub}，用來判斷要不要播動畫
-  const mark = () => ({ step: state().step, sub: state().sub || 0, spot: state().spot && state().step >= 3 ? +state().spot : 0 });
+  const mark = () => Proj.mark(M);
 
   /* 導覽 */
   function next() {
     const s = state();
     if (s.spot) return ST('spot', null);   // 正在放大某組明細時，先收起放大，不換頁
-    if (s.step === 6 && s.sub < maxSub()) return ST('sub', s.sub + 1);
-    if (s.step >= 7) return;
-    if (s.step === 1 && !gl().every(n => asg(n))) return A.toast('還有組別沒有分到國家，請先抽籤');
+    if (sid() === 'numberline' && s.sub < maxSub()) return ST('sub', s.sub + 1);
+    if (s.step >= A.lastStep()) return;
+    if (sid() === 'card' && !gl().every(n => asg(n))) return A.toast('還有組別沒有分到國家，請先抽籤');
+    if (sid() === 'card' && (s.sub || 0) < 1) return ST('sub', 1);          // 任務卡 → 世界地圖
     return DB.update(`rooms/${CODE}/state`, { step: s.step + 1, sub: 0, spot: null });
   }
   function prev() {
     const s = state();
     if (s.spot) return ST('spot', null);
-    if (s.step === 6 && s.sub > 0) return ST('sub', s.sub - 1);
+    if (sid() === 'numberline' && s.sub > 0) return ST('sub', s.sub - 1);
+    if (sid() === 'card' && s.sub > 0) return ST('sub', 0);                   // 世界地圖 → 任務卡
     if (s.step <= 0) return;
-    return DB.update(`rooms/${CODE}/state`, { step: s.step - 1, sub: s.step - 1 === 6 ? maxSub() : 0, spot: null });
+    return DB.update(`rooms/${CODE}/state`, { step: s.step - 1, sub: A.sid(s.step - 1) === 'numberline' ? maxSub() : (A.sid(s.step - 1) === 'card' ? 1 : 0), spot: null });
   }
   const togglePause = () => ST('paused', !state().paused);
 
@@ -128,15 +131,15 @@
     if (!own()) h += '<div class="banner">👁 這個房間不是用這台電腦／瀏覽器建立的，只能檢視與匯出海報，無法控制。</div>';
     if (tab === 'poster') { root.innerHTML = h + posterTabHTML(); mountThumbs(); return; }
     h += '<div class="ctrl-main"><nav class="steplist">' + C.steps.map((x, i) => `<button class="stepbtn ${i === step ? 'on' : ''} ${i < step ? 'past' : ''}" data-act="jump" data-i="${i}"><b>${i}</b> ${esc(x.title)}</button>`).join('') + '</nav>';
-    h += `<div class="stepbody"><h2>步驟 ${step}：${esc(C.steps[step].title)}${step === 6 ? `　<small>（顯示進度 ${s.sub} / ${maxSub()}）</small>` : ''}</h2>
-      <div class="tip"><span>🗣 教師口白（只有你看得到）</span>${esc(C.steps[step].tip)}</div>`;
+    h += `<div class="stepbody"><h2>步驟 ${step}：${esc(C.steps[step].title)}${sid() === 'numberline' ? `　<small>（顯示進度 ${s.sub} / ${maxSub()}）</small>` : ''}${sid() === 'card' ? `　<small>（投影幕：${s.sub ? '世界地圖' : '任務卡'}）</small>` : ''}</h2>
+      ${notesHTML(step)}`;
     h += stepControls();
     h += `<div class="navbtns"><button class="btn big" data-act="prev" ${step === 0 && s.sub === 0 ? 'disabled' : ''}>◀ 上一步</button>
-      <button class="btn primary big ${allDone() ? 'pulse' : ''}" data-act="next" ${step === 7 ? 'disabled' : ''}>${allDone() ? '✅ 全部完成　' : ''}${step === 6 && s.sub < maxSub() ? '顯示下一個 ▶' : '下一步 ▶'}</button></div>`;
+      <button class="btn primary big ${allDone() ? 'pulse' : ''}" data-act="next" ${step >= A.lastStep() ? 'disabled' : ''}>${allDone() ? '✅ 全部完成　' : ''}${sid() === 'numberline' && s.sub < maxSub() ? '顯示下一個 ▶' : (sid() === 'card' && !s.sub ? '🗺 顯示世界地圖 ▶' : '下一步 ▶')}</button></div>`;
     h += '<h3>各組狀態</h3><div class="gcards">' + gl().map(groupCard).join('') + '</div>';
     h += `<p class="muted"><button class="btn ghost" data-act="restart">🔄 重新開始（清空所有組別的作答）</button></p></div>`;
     h += `<aside class="pv"><div class="pv-label">📽 投影幕目前的畫面 <small>（點一下進入投影模式）</small></div>
-      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE), lastPv)}</div></div></aside></div>`;
+      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE, true), lastPv)}</div></div></aside></div>`;
     lastPv = mark();
     root.innerHTML = h;
     fitPreview();
@@ -159,25 +162,84 @@
     box.style.height = w * 1080 / 1920 + 'px';
     Proj.fit(box.firstElementChild, w, w * 1080 / 1920);
   }
+  /* ---------- 教師口白提示 ----------
+     讀 CONFIG.notes[步驟代號]，找不到再找 CONFIG.notes[分組名稱]；也相容舊格式（steps[i].tip 字串、[{say},{tip}] 陣列）。 */
+  // 「上課要說的話」的排序：數字越小越上面；想換順序，改這裡的數字即可
+  const RANK = { open: 1, hook: 2, explain: 4, say: 4, ask: 5, close: 6, next: 7 };
+  const NOTE_LABEL = { open: '🎬 開場', hook: '✨ 引起動機', explain: '🗣 說明', say: '🗣 說明', ask: '❓ 提問', expect: '💭 預期反應', close: '📌 收攏', next: '➡️ 過渡', tip: '⚠️ 提醒' };
+  function noteData(step) {
+    const sd = C.steps[step] || {}, N = C.notes || {};
+    let d = (sd.id && N[sd.id]) || (sd.group && N[sd.group]) || N[step] || null;
+    const toLines = arr => arr.map(x => x && x.type ? x : (x && x.say != null ? { type: 'explain', text: x.say } : (x && x.tip != null ? { type: 'tip', text: x.tip } : null))).filter(Boolean);
+    if (Array.isArray(d)) d = { lines: toLines(d) };                        // 舊格式：[{ say }, { tip }]
+    else if (d) d = Object.assign({}, d, { lines: toLines(d.lines || []) });
+    if (!d && sd.tip) d = { lines: [{ type: 'explain', text: sd.tip }] };     // 更舊的格式：steps[i].tip 字串
+    return d || { lines: [] };
+  }
+  // 「整節課的教學目標」預設收合；老師點開後，畫面更新時保持打開
+  let lessonOpen = false;
+  document.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('nt-lesson')) lessonOpen = e.target.open; }, true);
+  function notesHTML(step) {
+    const d = noteData(step), sd = C.steps[step] || {};
+    // 1. 把「預期反應」掛在它前面那一句底下；提醒另外收集
+    // 「預期反應」優先掛在它前面最近的「提問」；前面沒有提問就掛在後面第一個提問；都沒有才掛在前一句
+    const groups = [], tips = [], pending = [];
+    d.lines.forEach((l, i) => {
+      if (l.type === 'tip') tips.push(l);
+      else if (l.type === 'expect') pending.push({ l, at: groups.length });
+      else groups.push({ line: l, expects: [], i });
+    });
+    pending.forEach(p => {
+      const asks = groups.map((g, k) => g.line.type === 'ask' ? k : -1).filter(k => k >= 0);
+      const before = asks.filter(k => k < p.at);
+      const k = before.length ? before[before.length - 1] : (asks.length ? asks[0] : p.at - 1);
+      if (k >= 0) groups[k].expects.push(p.l); else groups.push({ line: { type: 'explain', text: '' }, expects: [p.l], i: -1, blank: true });
+    });
+    // 2. 依 RANK 穩定排序（同一類保持原本寫的先後）
+    const rk = g => RANK[g.line.type] || 4;
+    groups.sort((a, b) => rk(a) - rk(b) || a.i - b.i);
+    const one = l => `<div class="nt nt-${esc(l.type)}"><span class="nt-tag">${NOTE_LABEL[l.type] || esc(l.type)}</span>${esc(l.text)}</div>`;
+    let h = `<section class="notes"><h3 class="notes-h">🗒 教師口白提示（步驟 ${step}・${esc(sd.title || '')}）</h3>`;
+    if (groups.length) h += '<div class="nt-sec">🗣 上課要說的話</div>' + groups.map(g => (g.blank ? '' : one(g.line)) + g.expects.map(one).join('')).join('');
+    if (tips.length) h += '<div class="nt-sec">⚠️ 老師提醒</div>' + tips.map(one).join('');
+    if (A.sid(step) === 'lobby' && C.lessonGoals) {
+      const L = C.lessonGoals;
+      h += `<details class="nt-lesson" ${lessonOpen ? 'open' : ''}><summary>📚 整節課的教學目標</summary><b>${esc(L.title || '')}</b><ul>${(L.goals || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul>${L.timeline ? `<p>⏱ ${esc(L.timeline)}</p>` : ''}</details>`;
+    }
+    if (d.goal) h += `<div class="nt-goal"><b>🎯 這一步的目標</b>　${esc(d.goal)}<div class="nt-meta">${d.ref ? `<span>${esc(d.ref)}</span>` : ''}${d.time ? `<span>⏱ ${esc(d.time)}</span>` : ''}</div></div>`;
+    return h + '</section>';
+  }
+
   function stepControls() {
-    return stepControlsBase() + (state().step >= 3 ? spotPanel() : '');
+    return stepControlsBase() + (A.atOrAfter(state().step, 'round1') && !(C.steps[state().step] || {}).kind ? spotPanel() : '');
   }
   /* 上台發表：點一組，投影幕放大這一組的明細表 */
   function spotPanel() {
     const s = state(), cur = +s.spot || 0;
     const btns = gl().filter(asg).map(n => {
       const cc = asg(n), g = grp(n), r1 = A.calcRound(cc, g.r1, A.budget(cc, 1)), r2 = A.calcRound(cc, g.r2, A.budget(cc, 2));
-      const info = s.step >= 5 ? `第一回合剩 ${fmt(r1.remaining)}／第二回合剩 ${fmt(r2.remaining)}` : `剩 ${fmt(r1.remaining)} 元`;
+      const info = A.atOrAfter(s.step, 'round2') ? `第一回合剩 ${fmt(r1.remaining)}／第二回合剩 ${fmt(r2.remaining)}` : `剩 ${fmt(r1.remaining)} 元`;
       return `<button class="btn spotbtn ${cur === n ? 'on' : ''}" data-act="spot" data-n="${n}" style="--cc:${C.countries[cc].color}">${A.flag(cc, 'chip-flag')}第 ${n} 組 ${A.cname(cc)}<small>${(g.r1 || {}).checkedOut ? info : '還沒結帳'}</small></button>`;
     }).join('');
     return `<div class="panel mini spot-panel"><b>📣 上台發表</b>：點一組，投影幕就放大這一組的明細表（再點一次或按「收起」回到全班清單）
       <div class="spot-btns">${btns}<button class="btn ghost" data-act="spot" data-n="0" ${cur ? '' : 'disabled'}>✖ 收起放大</button></div></div>`;
   }
+  /* 🎬 影片步驟的控制：可嵌入 → ▶ ⏸ ⏮ 遙控（寫入 state/vid）；不可嵌入 → 另開 YouTube 視窗 */
+  function videoPanel(sd) {
+    const v = (C.videos || {})[sd.video] || {};
+    const info = `<div class="muted">${esc(v.title || '')}${v.length ? `（${esc(v.length)}）` : ''}</div>`;
+    if (v.embed) return `<div class="panel mini vid-panel"><b>🎬 影片遙控</b>（影片在投影畫面播放；控制台預覽不出聲）${info}
+      <div class="vid-btns"><button class="btn primary" data-act="vid" data-cmd="play">▶ 播放</button><button class="btn" data-act="vid" data-cmd="pause">⏸ 暫停</button><button class="btn" data-act="vid" data-cmd="restart">⏮ 從頭</button></div></div>`;
+    return `<div class="panel mini vid-panel"><b>🎬 影片</b>：這部影片不允許嵌入其他網站，請另開 YouTube 視窗播放。${info}
+      <div class="vid-btns"><button class="btn primary big" data-act="openvideo" data-v="${esc(sd.video)}">▶ 開啟影片（YouTube 新視窗）</button></div>
+      <div class="muted">開啟後把視窗拖到白板、按影片右下角的全螢幕；看完關掉視窗，再按「下一步」。</div></div>`;
+  }
   function stepControlsBase() {
-    const s = state(), step = s.step;
-    if (step <= 1) {
+    const s = state(), step = s.step, id = A.sid(step), sd = C.steps[step] || {};
+    if (sd.kind === 'video') return videoPanel(sd);
+    if (id === 'lobby' || id === 'card') {
       let h = '';
-      if (step === 0) {
+      if (id === 'lobby') {
         const dn = setDraft ? setDraft.n : s.groupCount, dc = setDraft ? setDraft.cs : ccList();
         h += `<div class="panel mini"><b>本局設定</b>（開始之後不能改；改完要按「套用設定」）<div class="row">組數：${[4, 5, 6].map(n => `<label class="pill"><input type="radio" name="sgc" value="${n}" ${dn === n ? 'checked' : ''}> ${n} 組</label>`).join('')}</div>
           <div class="row">國家：${C.countryOrder.map(cc => `<label class="pill"><input type="checkbox" class="sc" value="${cc}" ${dc.includes(cc) ? 'checked' : ''}> ${A.flag(cc, 'chip-flag')}${A.cname(cc)}</label>`).join('')} <button class="btn" data-act="applySettings">套用設定</button></div></div>`;
@@ -190,9 +252,9 @@
       }
       return h;
     }
-    if (step === 5) return `<div class="panel mini">第二回合預算：每天 3 美元 ≈ <b>${C.wbLineTWD}</b> 元</div>`;
-    if (step === 6) return `<div class="panel mini">每按一次「顯示下一個」，投影幕上就多出一個國家（由小到大）；最後依序出現世界銀行線、提問、各組剩下的錢。</div>`;
-    if (step === 7) return `<div class="panel mini"><button class="btn primary" data-act="tab" data-t="poster">前往海報總覽 ▶</button></div>`;
+    if (id === 'round2') return `<div class="panel mini">第二回合預算：每天 3 美元 ≈ <b>${C.wbLineTWD}</b> 元</div>`;
+    if (id === 'numberline') return `<div class="panel mini">每按一次「顯示下一個」，投影幕上就多出一個國家（由小到大）；最後依序出現世界銀行線、提問、各組剩下的錢。</div>`;
+    if (id === 'poster') return `<div class="panel mini"><button class="btn primary" data-act="tab" data-t="poster">前往海報總覽 ▶</button></div>`;
     return '';
   }
   function groupCard(n) {
@@ -226,11 +288,15 @@
     if (!M) return;
     projEl.classList.toggle('hidden', !projMode);
     document.body.classList.toggle('proj-on', projMode);
-    if (!projMode) { lastProj = null; return; }
-    projEl.innerHTML = `<div id="pjs" class="pj-stage">${Proj.render(M, Proj.env(CODE), lastProj)}</div>` + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　數字鍵 1～6 上台發表、0 收起　Esc 離開</div>';
-    lastProj = mark();
-    Proj.fit($('#pjs'));
+    if (!projMode) { lastProj = null; lastVidProj = undefined; projEl.innerHTML = ''; return; }   // 離開投影模式時清空，避免隱藏的影片繼續出聲
+    if (!Proj.shouldSkip($('#pjs'), M, lastProj)) {                   // 影片播放中不重畫
+      projEl.innerHTML = `<div id="pjs" class="pj-stage">${Proj.render(M, Proj.env(CODE), lastProj)}</div>` + '<div class="pj-hint">→ 空白鍵 下一步　← 上一步　P 暫停　數字鍵 1～6 上台發表、0 收起　Esc 離開</div>';
+      lastProj = mark();
+      Proj.fit($('#pjs'));
+    }
+    lastVidProj = Proj.handleVid($('#pjs'), M, lastVidProj);
   }
+  let lastVidProj;
   const refit = () => { Proj.fit($('#pjs')); fitPreview(); };
   window.addEventListener('resize', refit);
   document.addEventListener('visibilitychange', refit);
@@ -254,7 +320,7 @@
     if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
     else if (e.key === 'p' || e.key === 'P') togglePause();
-    else if (/^[0-9]$/.test(e.key) && state().step >= 3) { const n = +e.key; if (!n) ST('spot', null); else if (asg(n)) ST('spot', +state().spot === n ? null : n); }
+    else if (/^[0-9]$/.test(e.key) && A.atOrAfter(state().step, 'round1')) { const n = +e.key; if (!n) ST('spot', null); else if (asg(n)) ST('spot', +state().spot === n ? null : n); }
     else if (e.key === 'Escape') { projMode = false; if (document.fullscreenElement) document.exitFullscreen(); renderAll(); }
   });
   document.addEventListener('change', e => {
@@ -285,6 +351,8 @@
     if (act === 'exportOne') return doExport([+d.n], `第${d.n}組_${A.cname(asg(+d.n))}_海報.pdf`);
     if (!own()) return A.toast('只能檢視，無法控制這個房間');
     if (act === 'pause') return togglePause();
+    if (act === 'openvideo') { if (!Proj.openVideo(d.v)) A.alert('瀏覽器擋下了新視窗：請在網址列右邊允許「彈出式視窗」後再按一次。'); return; }
+    if (act === 'vid') { const cur = state().vid || {}; return ST('vid', { cmd: d.cmd, n: (cur.n || 0) + 1 }); }
     if (act === 'fs') { const on = !state().fs; await ST('fs', on); return A.toast(on ? '學生平板會出現「點一下進入全螢幕」，請學生點一下。' : '已關閉平板全螢幕，學生平板會離開全螢幕。'); }
     if (act === 'next') return next();
     if (act === 'prev') return prev();
