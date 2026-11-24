@@ -176,10 +176,13 @@
     h += '<h3>各組狀態</h3><div class="gcards">' + gl().map(groupCard).join('') + '</div>';
     h += `<p class="muted"><button class="btn ghost" data-act="restart">🔄 重新開始（清空所有組別的作答）</button></p></div>`;
     h += `<aside class="pv"><div class="pv-label">📽 投影幕目前的畫面 <small>（點一下進入投影模式）</small></div>
-      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE, true), lastPv)}</div></div>${navBtns}</aside></div>`;
+      <div class="pv-box" id="pvBox" data-act="proj"><div class="pj-stage pv-stage">${Proj.render(M, Proj.env(CODE, true), lastPv)}</div></div>${navBtns}${timerPanel()}</aside></div>`;
     lastPv = mark();
+    const tmrFocus = document.activeElement && document.activeElement.id === 'tmrMin';
     root.innerHTML = h;
+    if (tmrFocus && $('#tmrMin')) $('#tmrMin').focus();
     fitPreview();
+    scheduleTimerRedraw();
     // 預覽框的寬度一變（視窗縮放、版面換欄），就重新計算縮放比例
     if (pvRO) { pvRO.disconnect(); const box = $('#pvBox'); if (box) pvRO.observe(box); }
   }
@@ -273,6 +276,24 @@
       <div class="vid-btns"><button class="btn primary big" data-act="openvideo" data-v="${esc(sd.video)}">▶ 開啟影片（YouTube 新視窗）</button></div>
       <div class="muted">開啟後把視窗拖到白板、按影片右下角的全螢幕；看完關掉視窗，再按「下一步」。</div></div>`;
   }
+  /* ⏱ 倒數計時：任何步驟都能用；學生平板與投影幕都會出現小碼表，時間到自動顯示「眼睛看老師」 */
+  function timerPanel() {
+    const t = state().timer, running = A.timerLeft(t) > 0;
+    return `<div class="panel mini tmr-panel"><b>⏱ 倒數計時</b>
+      ${running ? `<div class="tmr-now">${A.timerHTML(t, true)}<button class="btn" data-act="timerAdd" data-sec="30">＋30 秒</button><button class="btn" data-act="timerAdd" data-sec="60">＋1 分</button><button class="btn ghost" data-act="timerStop">■ 停止</button></div>`
+        : `<div class="tmr-set">${[0.5, 1, 2, 3, 5].map(m => `<button class="btn" data-act="timer" data-sec="${m * 60}">${m < 1 ? '30 秒' : m + ' 分'}</button>`).join('')}
+          <span class="tmr-custom"><input id="tmrMin" class="mini-input" type="number" min="1" max="60" inputmode="numeric" placeholder="自訂" value="${esc(tmrDraft)}">分 <button class="btn primary" data-act="timerCustom">開始</button></span></div>`}</div>`;
+  }
+  // 時間到之後自動重畫控制台，讓面板回到「選時間」的樣子
+  let tmrRedraw = null, tmrDraft = '';
+  document.addEventListener('input', e => { if (e.target.id === 'tmrMin') tmrDraft = e.target.value; });
+  function scheduleTimerRedraw() {
+    clearTimeout(tmrRedraw);
+    const left = M && A.timerLeft(state().timer);
+    if (left > 0) tmrRedraw = setTimeout(() => { if (!projMode && M) renderCtrl(); }, left + 300);
+  }
+  const startTimer = sec => ST('timer', { end: Math.round(DB.now() + sec * 1000), sec });
+
   function stepControlsBase() {
     const s = state(), step = s.step, id = A.sid(step), sd = C.steps[step] || {};
     if (sd.kind === 'video') return videoPanel(sd);
@@ -291,7 +312,7 @@
       }
       return h;
     }
-    if (id === 'round2') return `<div class="panel mini">第二回合預算：每天 3 美元 ≈ <b>${C.wbLineTWD}</b> 元</div>`;
+    if (id === 'round2') return `<div class="panel mini">第二回合預算：每天 3 美元 ≈ 台幣 <b>${C.wbLineTWD}</b> 元</div>`;
     if (id === 'numberline') return `<div class="panel mini">每按一次「顯示下一個」，投影幕上就多出一個國家（由小到大）；最後依序出現世界銀行線、提問、各組剩下的錢。</div>`;
     if (id === 'poster') return `<div class="panel mini"><button class="btn primary" data-act="tab" data-t="poster">前往海報總覽 ▶</button></div>`;
     return '';
@@ -394,6 +415,10 @@
     if (act === 'openvideo') { if (!Proj.openVideo(d.v)) A.alert('瀏覽器擋下了新視窗：請在網址列右邊允許「彈出式視窗」後再按一次。'); return; }
     if (act === 'vid') { const cur = state().vid || {}; return ST('vid', { cmd: d.cmd, n: (cur.n || 0) + 1 }); }
     if (act === 'fs') { const on = !state().fs; await ST('fs', on); return A.toast(on ? '學生平板會出現「點一下進入全螢幕」，請學生點一下。' : '已關閉平板全螢幕，學生平板會離開全螢幕。'); }
+    if (act === 'timer') return startTimer(+d.sec);
+    if (act === 'timerCustom') { const m = parseFloat(($('#tmrMin') || {}).value); if (!(m > 0 && m <= 60)) return A.toast('請輸入 1～60 分鐘'); return startTimer(Math.round(m * 60)); }
+    if (act === 'timerAdd') { const t = state().timer; if (!t || A.timerLeft(t) <= 0) return startTimer(+d.sec); return ST('timer', { end: t.end + d.sec * 1000, sec: (t.sec || 0) + +d.sec }); }
+    if (act === 'timerStop') return ST('timer', null);
     if (act === 'next') return next();
     if (act === 'prev') return prev();
     if (act === 'jump') return DB.update(`rooms/${CODE}/state`, { step: +d.i, sub: 0, spot: null });
@@ -423,6 +448,8 @@
   /* ---------- 啟動 ---------- */
   DB.ready.then(() => {
     if (REMOTE) return remoteJoin();   // 平板遙控連結：連結本身就是通行證，不用輸入密碼
+    // 從大廳按「我是老師」進來（?login=1）：一律重新輸入密碼，避免學生誤觸直接進入控制台
+    if (QS.get('login')) { try { sessionStorage.removeItem('sgTeacherOk'); } catch (e) {} try { history.replaceState(null, '', location.pathname + location.search.replace(/[?&]login=1/, '').replace(/^&/, '?')); } catch (e) {} }
     let ok = false; try { ok = sessionStorage.getItem('sgTeacherOk') === '1'; } catch (e) {}
     ok && lsGet('sgPw', null) ? showHome() : showLogin();
   }).catch(err => { root.innerHTML = `<div class="center-card"><h1>連線失敗</h1><p>${esc(err.message || err)}</p></div>`; });

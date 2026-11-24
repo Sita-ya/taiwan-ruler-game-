@@ -17,7 +17,12 @@
     DB.remove = p => db.ref(p).remove();
     DB.on = (p, cb) => { const r = db.ref(p); const h = r.on('value', s => cb(s.val())); return () => r.off('value', h); };
     DB.onConnection = cb => { const r = db.ref('.info/connected'); const h = r.on('value', s => cb(!!s.val())); return () => r.off('value', h); };
+    // 各裝置的時鐘可能差幾秒：用 Firebase 伺服器時間校正，倒數計時才會一致
+    DB.offset = 0;
+    db.ref('.info/serverTimeOffset').on('value', s => { DB.offset = s.val() || 0; });
+    DB.now = () => Date.now() + DB.offset;
   } else {
+    DB.now = () => Date.now();
     const KEY = 'sgMockDB';
     let uid = null;
     try { uid = sessionStorage.getItem('sgMockUid'); } catch (e) {}

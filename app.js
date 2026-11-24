@@ -75,7 +75,7 @@
   App.receiptTable = (cc, rd, budget, opt) => {
     opt = opt || {};
     const r = App.calcRound(cc, rd, budget);
-    let h = '<table class="rcpt"><thead><tr><th>品項</th><th class="amt">金額</th></tr></thead><tbody>';
+    let h = '<table class="rcpt"><thead><tr><th>品項</th><th class="amt">金額（台幣）</th></tr></thead><tbody>';
     r.lines.forEach(l => {
       const nm = l.cat.icon + ' ' + l.cat.name + (l.opt ? '：' + l.opt.name : '');
       if (l.state === 'buy') h += `<tr><td>${App.esc(nm)}</td><td class="amt">${App.fmt(l.price)}</td></tr>`;
@@ -91,7 +91,7 @@
       else h += '<tr class="skip"><td colspan="2">（沒有多的錢可以買）</td></tr>';
       h += `<tr class="total"><td>合計花費</td><td class="amt">${App.fmt(r.total)} 元</td></tr>`;
     }
-    h += `<tr class="left"><td>預算 ${App.fmt(budget)} 元，剩下</td><td class="amt ${(budget - (opt.noExtras ? r.needsTotal : r.total)) <= 0 ? 'zero' : ''}">${App.fmt(Math.max(0, budget - (opt.noExtras ? r.needsTotal : r.total)))} 元</td></tr>`;
+    h += `<tr class="left"><td>預算台幣 ${App.fmt(budget)} 元，剩下</td><td class="amt ${(budget - (opt.noExtras ? r.needsTotal : r.total)) <= 0 ? 'zero' : ''}">${App.fmt(Math.max(0, budget - (opt.noExtras ? r.needsTotal : r.total)))} 元</td></tr>`;
     h += '</tbody></table>';
     return h;
   };
@@ -107,13 +107,13 @@
       <div class="p-line">
         <div class="p-line-main"><div class="p-big">${c.name}的貧窮線，換算成台幣一天約 <b>${App.fmt(c.daily)}</b> 元</div>
         <div class="p-small">${App.esc(c.raw)}　｜　${App.esc(c.calc)}　→　${App.esc(c.calc2)}<br>資料來源：${App.esc(c.source)}</div></div>
-        <div class="p-wb">世界銀行<br>每天 3 美元<br><b>≈ ${C.wbLineTWD} 元</b></div>
+        <div class="p-wb">世界銀行<br>每天 3 美元<br>≈ 台幣<br><b>${C.wbLineTWD} 元</b></div>
       </div>
       <div class="p-rounds">
-        <div class="p-col"><h3>第一回合：用${c.name}的及格線（${App.fmt(c.daily)} 元）</h3>${App.receiptTable(cc, g.r1, c.daily)}</div>
-        <div class="p-col"><h3>第二回合：用每天 3 美元（${C.wbLineTWD} 元）</h3>${App.receiptTable(cc, g.r2, C.wbLineTWD)}</div>
+        <div class="p-col"><h3>第一回合：用${c.name}的及格線（台幣 ${App.fmt(c.daily)} 元）</h3>${App.receiptTable(cc, g.r1, c.daily)}</div>
+        <div class="p-col"><h3>第二回合：用每天 3 美元（約台幣 ${C.wbLineTWD} 元）</h3>${App.receiptTable(cc, g.r2, C.wbLineTWD)}</div>
       </div>
-      <div class="p-box"><span>請貼上小組手寫的「我的大發現」</span></div>
+      <div class="p-box"><div class="p-guide"><b>我的大發現</b>（請貼上小組手寫的大發現）<br>可以這樣寫：在＿＿（國家），一天的及格線大約是台幣＿＿元。用每天 3 美元（約台幣 ${C.wbLineTWD} 元），我們買得到＿＿，買不到＿＿。<br>我們發現＿＿，因為＿＿。（寫出一個數字、一個比較、一個原因）</div></div>
       <div class="p-foot">國家資料來源：${App.esc(c.source)}。物價來源：Numbeo 各國平均物價（2026 年 11 月）。${App.esc(C.rateDate)}。${App.esc(C.rateNote)}</div>
     </div>`;
   };
@@ -152,6 +152,30 @@
       pdf.save(filename);
     } finally { host.remove(); }
   };
+
+  /* ---------- 倒數計時（state/timer = { end: 結束時間（伺服器時間毫秒）, sec: 總秒數 }） ----------
+     timerHTML 產生小碼表；每 0.25 秒自動更新畫面上所有的小碼表。
+     倒數中：顯示小碼表；時間到：顯示「⏰ 時間到！眼睛看老師」timeUpSeconds 秒；之後自動消失。 */
+  App.timerHTML = (t, inline) => t && t.end
+    ? `<div class="tmr ${inline ? 'inline' : ''}" data-end="${+t.end}" data-sec="${+t.sec || 60}"><div class="tmr-badge"><span class="tmr-ico">⏱</span><b class="tmr-t"></b><i class="tmr-bar"><em></em></i></div>${inline ? '' : '<div class="tmr-up"><div class="tmr-up-in"><div class="big-emoji">⏰</div><h1>時間到！</h1><p>👀 眼睛看老師</p></div></div>'}</div>`
+    : '';
+  App.timerLeft = t => t && t.end ? t.end - (window.DB && DB.now ? DB.now() : Date.now()) : -1e12;
+  const tickTimers = () => {
+    const now = window.DB && DB.now ? DB.now() : Date.now(), upMs = (C.timeUpSeconds || 5) * 1000;
+    document.querySelectorAll('.tmr[data-end]').forEach(el => {
+      const left = +el.dataset.end - now, sec = +el.dataset.sec || 60;
+      const st = left > 0 ? 'run' : (left > -upMs ? 'up' : 'off');
+      if (el.dataset.st !== st) { el.dataset.st = st; el.classList.toggle('run', st === 'run'); el.classList.toggle('up', st === 'up'); }
+      if (st === 'run') {
+        const s = Math.ceil(left / 1000), txt = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+        const t = el.querySelector('.tmr-t'); if (t.textContent !== txt) t.textContent = txt;
+        el.classList.toggle('warn', s <= 10);
+        el.querySelector('.tmr-bar em').style.width = Math.max(0, Math.min(100, left / (sec * 1000) * 100)) + '%';
+      }
+    });
+  };
+  setInterval(tickTimers, 250);
+  App.tickTimers = tickTimers;
 
   /* ---------- 小元件 ---------- */
   App.toast = msg => {

@@ -92,6 +92,9 @@
     const cc = S.assign && S.assign[N];
     $('#pause').classList.toggle('hidden', !S.paused);
     $('#frozen').classList.toggle('hidden', !(S.frozen && S.frozen[N]) || S.paused);
+    // ⏱ 老師開的倒數計時：右上角小碼表；時間到蓋上「時間到！眼睛看老師」幾秒
+    const tk = JSON.stringify(S.timer || null), tb = $('#tmrBox');
+    if (tb && tb.dataset.k !== tk) { tb.dataset.k = tk; tb.innerHTML = A.timerHTML(S.timer); A.tickTimers(); }
     if (cc) A.setTitleFlagColor(cc);
     const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)}</div></div>`;
     let body = '';
@@ -100,6 +103,10 @@
     let look = null;   // 不是 null 就顯示「請抬頭看大螢幕」（整頁，沒有任何可以點的東西）
     if (id === 'lobby') body = viewLobby();
     else if (kind === 'video') look = '🎬 一起看影片';
+    else if (kind === 'videoIntro') look = '🎬 等一下要一起看影片';
+    else if (id === 'discover') look = '✍️ 學習怎麼寫「我的大發現」';
+    else if (kind === 'intro') look = '老師正在說明任務，聽完再開始喔';
+    else if (id === 'card' && (S.sub || 0) >= 1) look = '🗺 看看各組的國家在世界地圖的哪裡';
     else if (kind === 'videoSum' || id === 'numberline') look = '';
     else if (!cc) body = wait('等待老師抽籤分配國家…', '⏳');
     else if (id === 'card') body = viewCard(cc);
@@ -109,7 +116,7 @@
       else body = viewSearch(cc);
     }
     else if (id === 'round1' || id === 'store' || id === 'round2') body = viewShop(cc, id);
-    else if (id === 'poster') body = viewPoster(cc);
+    else if (id === 'poster') { if (noticeLeft('poster', C.studentPosterSeconds || 20) <= 0) look = '📄 老師要說明海報怎麼完成'; else body = viewPoster(cc); }
     else look = '';
     if (look !== null) { root.innerHTML = lookUpHTML(look); updateFs(); return; }
     root.innerHTML = head + `<div class="stage">${body}</div>`;
@@ -170,8 +177,8 @@
   const lookUpHTML = sub => `<div class="lookup"><div class="lookup-eyes">👀</div><h1>請抬頭看大螢幕</h1>${sub ? `<p>${esc(sub)}</p>` : ''}</div>`;
   /* 通知類畫面只顯示 studentNoticeSeconds 秒：回傳還剩幾毫秒（第一次呼叫時開始計時，時間到自動重畫） */
   let noticeAt = {}, lastStepSeen = null, noticeTimer = null;
-  function noticeLeft(key) {
-    const total = (C.studentNoticeSeconds || 10) * 1000;
+  function noticeLeft(key, sec) {
+    const total = (sec || C.studentNoticeSeconds || 10) * 1000;
     if (!noticeAt[key]) noticeAt[key] = Date.now();
     const left = total - (Date.now() - noticeAt[key]);
     if (left > 0) { clearTimeout(noticeTimer); noticeTimer = setTimeout(render, left + 50); }
@@ -199,11 +206,12 @@
       <div class="search-page"><div class="s-logo">${logo}</div>
       <div class="s-bar"><span class="s-ico">🔍</span><span class="s-text">${viewCC ? C.countries[viewCC].name + ' 貧窮線' : '點下面的國家名稱，就會搜尋它的貧窮線'}</span></div>
       <div class="s-chips">${C.countryOrder.map(k => `<button class="chip ${viewCC === k ? 'on' : ''}" data-act="view" data-cc="${k}">${A.flag(k, 'chip-flag')}${C.countries[k].name}</button>`).join('')}</div>`;
-    if (viewCC) h += dataCard(viewCC);
+    if (viewCC && viewCC !== cc) h += `<div class="not-mine">🙅 「${C.countries[viewCC].name}」不是你的國家呦！<br><small>請點你們的國家：${A.flag(cc, 'chip-flag')}<b>${mine.name}</b></small></div>`;
+    else if (viewCC) h += dataCard(viewCC);
     h += '</div>';
     h += `<div class="answer-bar">${ans.ok
-      ? `<div class="ans-ok">✅ 答對了！我們的國家，一天的及格線大約是 <b>${fmt(mine.daily)}</b> 元台幣。<br><small>這個數字就是第一回合的預算。</small><div class="notice-bar"><i style="animation-duration:${Math.max(0, noticeLeft('search')) / 1000}s"></i></div></div>`
-      : `<label>我們的國家，一天的及格線大約是 <input id="ans" class="ans-input" type="number" inputmode="numeric" min="0" placeholder="＿＿"> 元台幣</label>
+      ? `<div class="ans-ok">✅ 答對了！我們的國家，一天的及格線大約是台幣 <b>${fmt(mine.daily)}</b> 元。<br><small>這個數字就是第一回合的預算。</small><div class="notice-bar"><i style="animation-duration:${Math.max(0, noticeLeft('search')) / 1000}s"></i></div></div>`
+      : `<label>我們的國家，一天的及格線大約是台幣 <input id="ans" class="ans-input" type="number" inputmode="numeric" min="0" placeholder="＿＿"> 元</label>
          <button class="btn primary" data-act="answer">確認</button>${hint ? `<div class="hint">${esc(hint)}</div>` : ''}`}</div>`;
     return h;
   }
@@ -224,7 +232,7 @@
     const rd = G['r' + round] || {};
     const budget = A.budget(cc, round);
     if (round === 2 && !rd.started && !rd.cart && !rd.checkedOut) {
-      return `<div class="center-card intro"><h2>🌍 世界銀行的線</h2><p class="big-p">世界銀行訂的極端貧窮線是<b>每人每天 3 美元</b>。用匯率換算，大約是 <b>${C.wbLineTWD} 元</b>台幣。</p><p class="big-p">現在用這筆錢，在<b>同一個國家</b>再買一次！</p><button class="btn primary big" data-act="startR2">開始採買</button></div>`;
+      return `<div class="center-card intro"><h2>🌍 世界銀行的線</h2><p class="big-p">世界銀行訂的極端貧窮線是<b>每人每天 3 美元</b>。用匯率換算，大約是台幣 <b>${C.wbLineTWD} 元</b>。</p><p class="big-p">現在用這筆錢，在<b>同一個國家</b>再買一次！</p><button class="btn primary big" data-act="startR2">開始採買</button></div>`;
     }
     if (!rd.checkedOut) return needsView(cc, round, rd, budget);
     if (!rd.storeDone && id !== 'round1') return storeView(cc, round, rd, budget);
@@ -232,8 +240,8 @@
     const r = A.calcRound(cc, rd, budget);
     let h = '';
     if (round === 2 && rd.storeDone) {
-      h = `<div class="compare"><div class="cmp-col"><h3>第一回合：用${A.cname(cc)}的及格線（${fmt(A.budget(cc, 1))} 元）</h3>${A.receiptTable(cc, G.r1, A.budget(cc, 1))}</div>
-        <div class="cmp-col"><h3>第二回合：用每天 3 美元（${C.wbLineTWD} 元）</h3>${A.receiptTable(cc, G.r2, C.wbLineTWD)}</div></div>
+      h = `<div class="compare"><div class="cmp-col"><h3>第一回合：用${A.cname(cc)}的及格線（台幣 ${fmt(A.budget(cc, 1))} 元）</h3>${A.receiptTable(cc, G.r1, A.budget(cc, 1))}</div>
+        <div class="cmp-col"><h3>第二回合：用每天 3 美元（約台幣 ${C.wbLineTWD} 元）</h3>${A.receiptTable(cc, G.r2, C.wbLineTWD)}</div></div>
         <div class="cmp-q">比一比：哪一次買得比較多？為什麼？</div>`;
       if (r.unaffordable) h += `<div class="reminder">💡 ${esc(C.reminderCard)}</div>`;
       return h;
@@ -243,11 +251,11 @@
     h += `<p class="big-p">${full ? '這一回合完成了，請等老師的指令。' : '結帳完成！請等老師的指令。'}</p></div>`;
     return h;
   }
-  const moneyBar = (budget, remaining) => `<div class="moneybar"><div>今天的預算：<b>${fmt(budget)}</b> 元</div><div class="left ${remaining <= 0 ? 'zero' : ''}">剩餘金額 <b>${fmt(remaining)}</b> 元</div></div>`;
+  const moneyBar = (budget, remaining) => `<div class="moneybar"><div>今天的預算：台幣 <b>${fmt(budget)}</b> 元</div><div class="left ${remaining <= 0 ? 'zero' : ''}">剩下台幣 <b>${fmt(remaining)}</b> 元</div></div>`;
 
   function needsView(cc, round, rd, budget) {
     const r = A.calcRound(cc, rd, budget);
-    let h = moneyBar(budget, r.remaining) + '<div class="needs">';
+    let h = moneyBar(budget, r.remaining) + '<div class="shop-guide">🛒 小組討論好「要買的」和「買不起的」之後，請一欄一欄依序點選<b>商品</b>或<b>「買不起／放棄」</b>。每一欄都選好，才能按最下面的「🧾 結帳」呦！</div><div class="needs">';
     r.lines.forEach(l => {
       const avail = budget - r.needsTotal + l.price;
       h += `<section class="need ${l.state}"><h3>${l.cat.icon} ${l.cat.name}<small>${l.state === 'none' ? '請做決定' : (l.state === 'skip' ? '已放棄' : '已買')}</small></h3><div class="opts">`;
@@ -313,7 +321,7 @@
     if (!S || !G) return;
     if (S.paused || (S.frozen && S.frozen[N])) return;
     const cc = S.assign && S.assign[N];
-    if (act === 'view') { viewCC = d.cc; hint = ''; return render(); }
+    if (act === 'view') { viewCC = d.cc; hint = ''; return render(); }   // 點到別的國家：viewSearch 只顯示「不是你的國家」
     if (act === 'answer' && A.sid(S.step) === 'search') {
       const v = parseFloat(draft);
       if (isNaN(v)) return A.toast('請先輸入一個數字');

@@ -83,14 +83,19 @@
     const spot = s.spot && asg(s.spot) && A.atOrAfter(step, 'round1') ? +s.spot : 0;
     const enter = prev && (prev.step !== step || (prev.spot || 0) !== spot || (id === 'card' && prev.sub !== (s.sub || 0))) ? 'enter' : '';
     // 全班暫停：projPauseFrom 之前的步驟，投影幕也蓋上「眼睛看老師」；之後（各組上台分享）投影幕照常顯示，只在角落標示
-    if (s.paused && !A.atOrAfter(step, C.projPauseFrom)) return '<div class="pj-paused"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>';
+    const timer = A.timerHTML(s.timer);   // ⏱ 倒數計時小碼表（時間到會蓋上「眼睛看老師」）
+    setTimeout(A.tickTimers, 0);
+    if (s.paused && !A.atOrAfter(step, C.projPauseFrom)) return '<div class="pj-paused"><div><div class="big-emoji">👀</div><h1>眼睛看老師</h1></div></div>' + timer;
     const badge = s.paused ? '<div class="pj-pausebadge">⏸ 學生平板暫停中</div>' : '';
-    return body() + badge;
+    return body() + badge + timer;
 
     function body() {
       if (spot) return spotlight(M, spot, step, enter);
       if (sd.kind === 'video') return videoSlide(sd, sl, env, enter);
       if (sd.kind === 'videoSum') return videoSumSlide(sl, enter);
+      if (sd.kind === 'videoIntro') return videoIntroSlide(sd, sl, enter);
+      if (id === 'discover') return discoverSlide(sl, enter);
+      if (sd.kind === 'intro') return introSlide(sd, sl, enter);
       if (id === 'lobby') {
         return `<div class="pj pj-lobby ${enter}"><div class="pj-l"><h1>${esc(C.title)}</h1>${subLine(sl.sub)}${sl.point ? `<div class="pj-recap">${br(sl.point)}</div>` : ''}<img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
           <div class="pj-groups">${gl.map(n => `<div class="pj-g ${grp(n).uid ? 'on' : ''}">第 ${n} 組<br><small>${grp(n).uid ? '已加入 ✓' : '等待中'}</small></div>`).join('')}</div></div>
@@ -151,10 +156,33 @@
       <div class="pj-vbox">${box}</div><div class="pj-credit">${esc(v.title || '')}${v.length ? `（${esc(v.length)}）` : ''}｜${esc(v.credit || '')}</div></div>`;
   }
 
-  /* 影片之後的收攏頁 */
+  /* 影片介紹頁（播放前）：縮圖＋介紹文字＋觀看重點 */
+  function videoIntroSlide(sd, sl, enter) {
+    const v = (C.videos || {})[sd.video] || {};
+    return `<div class="pj pj-vintro ${enter}"><h1 class="pj-h">🎬 ${esc(v.heading || sd.title)}</h1>
+      <div class="vi-body"><div class="vi-thumb"><img src="https://i.ytimg.com/vi/${encodeURIComponent(v.youtubeId)}/hqdefault.jpg" alt="" onerror="this.remove()"><span>${esc(v.length || '')}</span></div>
+      <div class="vi-desc">${br(sl.desc || '')}</div></div>
+      <div class="pj-credit">${esc(v.title || '')}｜${esc(v.credit || '')}</div>${askBar(sl.watch)}</div>`;
+  }
+  /* 說明頁：學生平板顯示「請抬頭看大螢幕」，老師在這頁講解任務 */
+  function introSlide(sd, sl, enter) {
+    const pts = sl.points || [];
+    return `<div class="pj pj-intro ${enter}"><h1 class="pj-h">${esc(sl.title || sd.title)}</h1>${subLine(sl.sub)}
+      ${pts.length ? `<div class="in-steps">${pts.map((p, i) => `<div class="in-step"><b>${i + 1}</b><span>${br(p)}</span></div>`).join('')}</div>` : ''}
+      ${sl.point ? `<div class="in-warn">⚠ ${br(sl.point)}</div>` : ''}${askBar(sl.ask)}</div>`;
+  }
+  /* 「我要如何描述我的大發現」鷹架頁 */
+  function discoverSlide(sl, enter) {
+    return `<div class="pj pj-disc ${enter}"><h1 class="pj-h">✍️ ${esc(sl.title || '我的大發現')}</h1>${subLine(sl.sub)}
+      <div class="dc-wrap"><div class="dc-must"><div class="dc-h">大發現裡要有：</div>${(sl.must || []).map(m => `<div class="dc-m">${br(m)}</div>`).join('')}</div>
+      <div class="dc-start"><div class="dc-h">可以這樣開頭：</div><ul>${(sl.starters || []).map(s => `<li>${br(s)}</li>`).join('')}</ul>
+      ${sl.example ? `<div class="dc-ex">${br(sl.example)}</div>` : ''}</div></div>${sl.point ? `<div class="in-warn dc-warn">⚠ ${br(sl.point)}</div>` : ''}${askBar(sl.ask)}</div>`;
+  }
+
+  /* 看完影片後的收攏頁 */
   function videoSumSlide(sl, enter) {
     const stats = (sl.stats || []).slice(0, 3);
-    return `<div class="pj pj-vsum ${enter}"><h1 class="pj-h">${esc(sl.title || '影片之後')}</h1>${subLine(sl.sub)}
+    return `<div class="pj pj-vsum ${enter}"><h1 class="pj-h">${esc(sl.title || '看完影片後')}</h1>${subLine(sl.sub)}
       ${stats.length ? `<div class="vs-stats">${stats.map((x, i) => `<div class="vs-card c${i}"><div class="vs-big">${esc(x.big)}</div><div class="vs-label">${br(x.label)}</div></div>`).join('')}</div>` : ''}
       ${sl.source ? `<div class="vs-source">${br(sl.source)}</div>` : ''}
       ${sl.statement ? `<div class="vs-statement">${br(sl.statement)}</div>` : ''}${askBar(sl.ask)}</div>`;
@@ -165,7 +193,7 @@
     const round = id === 'round2' ? 2 : 1;
     const title = id === 'round1' ? '第一回合：各組的採買清單'
       : id === 'store' ? '第一回合＋當地商店：各組買到的東西'
-        : `第二回合（每天 3 美元 ≈ ${C.wbLineTWD} 元）：各組的採買清單`;
+        : `第二回合（約台幣 ${C.wbLineTWD} 元）：各組的採買清單`;
     const list = gl.filter(asg);
     const cards = list.map(n => {
       const cc = asg(n), c = C.countries[cc], g = grp(n), rd = g['r' + round] || {};
@@ -182,7 +210,7 @@
         }
         inner += `<div class="cl-foot"><span>必需品 ${fmt(r.needsTotal)} 元${r.extrasTotal ? `＋額外 ${fmt(r.extrasTotal)} 元` : ''}</span><span class="cl-left ${r.remaining <= 0 ? 'zero' : ''}">剩 <b>${fmt(r.remaining)}</b> 元</span></div>`;
       }
-      return `<div class="cl-card" style="--cc:${c.color}"><div class="cl-head">${A.flag(cc, 'cl-flag')}<b>第 ${n} 組・${c.name}</b><span>預算 ${fmt(budget)} 元</span></div>${inner}</div>`;
+      return `<div class="cl-card" style="--cc:${c.color}"><div class="cl-head">${A.flag(cc, 'cl-flag')}<b>第 ${n} 組・${c.name}</b><span>預算 台幣 ${fmt(budget)} 元</span></div>${inner}</div>`;
     }).join('');
     return `<div class="pj cl ${enter} ${sl.ask ? 'has-ask' : ''}"><h1 class="pj-h cl-h">${title}</h1>${sl.sub ? `<div class="cl-sub">${br(sl.sub)}</div>` : ''}<div class="cl-grid ${list.length <= 4 ? 'two' : ''}">${cards}</div>${askBar(sl.ask)}</div>`;
   }
@@ -191,8 +219,8 @@
   function spotlight(M, n, step, enter) {
     const cc = M.state.assign[n], c = C.countries[cc], g = (M.groups && M.groups[n]) || {};
     const r1 = g.r1 || {};
-    const col1 = `<div class="sp-col"><h2>第一回合：用${c.name}的及格線（${fmt(c.daily)} 元）</h2>${r1.checkedOut ? A.receiptTable(cc, r1, c.daily, { noExtras: A.sid(step) === 'round1' && !r1.storeDone }) : '<div class="cl-wait">還沒結帳</div>'}</div>`;
-    const col2 = A.atOrAfter(step, 'round2') ? `<div class="sp-col"><h2>第二回合：用每天 3 美元（${C.wbLineTWD} 元）</h2>${(g.r2 || {}).checkedOut ? A.receiptTable(cc, g.r2, C.wbLineTWD) : '<div class="cl-wait">還沒結帳</div>'}</div>` : '';
+    const col1 = `<div class="sp-col"><h2>第一回合：用${c.name}的及格線（台幣 ${fmt(c.daily)} 元）</h2>${r1.checkedOut ? A.receiptTable(cc, r1, c.daily, { noExtras: A.sid(step) === 'round1' && !r1.storeDone }) : '<div class="cl-wait">還沒結帳</div>'}</div>`;
+    const col2 = A.atOrAfter(step, 'round2') ? `<div class="sp-col"><h2>第二回合：用每天 3 美元（約台幣 ${C.wbLineTWD} 元）</h2>${(g.r2 || {}).checkedOut ? A.receiptTable(cc, g.r2, C.wbLineTWD) : '<div class="cl-wait">還沒結帳</div>'}</div>` : '';
     return `<div class="pj sp ${enter}" style="--cc:${c.color}"><div class="sp-head">📣 第 ${n} 組上台發表　${A.flag(cc, 'sp-flag')}<b>${c.name}</b></div>
       <div class="sp-cols ${col2 ? 'two' : ''}">${col1}${col2}</div>${col2 ? '<div class="sp-q">比一比：哪一次買得比較多？為什麼？</div>' : ''}</div>`;
   }
@@ -220,7 +248,7 @@
       h += `<div class="nl-item ${i % 2 === 0 ? 'up' : 'down'} ${sub > i ? 'in' : ''} ${fresh(i + 1)}" style="left:${pos(it.v)}%;--cc:${C.countries[it.cc].color}"><div class="nl-card">${A.flag(it.cc, 'nl-flag')}<b>${A.cname(it.cc)}</b><span>一天 ${fmt(it.v)} 元</span>
         ${sub >= k + 3 ? `<em class="left ${fresh(k + 3)}">第一回合買完必需品後<br>還剩 <b>${lo == null ? '—' : fmt(lo)}</b> 元</em>` : ''}</div><div class="nl-stem"></div></div>`;
     });
-    h += `<div class="nl-wb ${sub >= k + 1 ? 'in' : ''} ${fresh(k + 1)}" style="left:${pos(C.wbLineTWD)}%"><span>世界銀行：每天 3 美元 ≈ ${C.wbLineTWD} 元</span></div></div>
+    h += `<div class="nl-wb ${sub >= k + 1 ? 'in' : ''} ${fresh(k + 1)}" style="left:${pos(C.wbLineTWD)}%"><span>世界銀行：每天 3 美元 ≈ 台幣 ${C.wbLineTWD} 元</span></div></div>
       <div class="nl-note">數線前段放大（越往右，每一格代表的金額越大），標籤寫的是實際金額</div>
       <div class="nl-q ${sub >= k + 2 ? 'in' : ''} ${fresh(k + 2)}">為什麼日本、美國的貧窮線比肯亞高好幾倍，在當地生活的人依然很辛苦？</div>
       ${A.SL('numberline').close ? `<div class="nl-close ${sub >= k + 3 ? 'in' : ''} ${fresh(k + 3)}">💡 ${br(A.SL('numberline').close)}</div>` : ''}</div>`;

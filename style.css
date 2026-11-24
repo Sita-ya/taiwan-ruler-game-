@@ -459,3 +459,67 @@ body.projector #pjs{position:absolute}
 .nl .nl-note{bottom:186px}
 .nl .nl-close{bottom:120px}
 .pj-poster{display:flex;flex-direction:column;justify-content:center;padding-bottom:150px}.pj-poster .pj-nextbox ol{font-size:30px}
+
+.p-guide{font-size:17px;color:#b8b8b8;line-height:1.75}.p-guide b{color:#999;font-size:19px}
+.p-wb b{font-size:46px;line-height:1.1}
+/* ===== 投影：影片介紹頁、說明頁、大發現鷹架頁 ===== */
+.pj-vintro .pj-h{margin-bottom:24px}
+.vi-body{display:flex;gap:44px;align-items:center;justify-content:center;margin:0 20px}
+.vi-thumb{flex:none;width:640px;height:360px;border:8px solid #2B2D42;border-radius:18px;overflow:hidden;position:relative;background:#000}
+.vi-thumb img{width:100%;height:100%;object-fit:cover}
+.vi-thumb span{position:absolute;right:10px;bottom:10px;background:rgba(0,0,0,.75);color:#fff;font-size:24px;padding:2px 12px;border-radius:8px}
+.vi-desc{flex:1;max-width:1000px;font-size:38px;font-weight:700;line-height:1.65;color:#2b2d42;background:#fff;border-left:12px solid #3A86C8;border-radius:20px;padding:24px 34px}
+.pj-vintro .pj-credit{text-align:center;margin-top:20px}
+.pj-intro{display:flex;flex-direction:column;justify-content:center;padding-bottom:160px}
+.pj-intro .pj-h{font-size:64px}
+.in-steps{display:flex;gap:28px;justify-content:center;margin-top:20px}
+.in-step{flex:1;max-width:540px;background:#fff;border:6px solid #3A86C8;border-radius:28px;padding:26px 24px;text-align:center;font-size:36px;font-weight:700;line-height:1.4}
+.in-step b{display:flex;margin:0 auto 14px;width:76px;height:76px;border-radius:50%;background:#3A86C8;color:#fff;align-items:center;justify-content:center;font-size:44px}
+.in-warn{text-align:center;font-size:34px;font-weight:700;color:#b5541b;margin-top:28px}
+.pj-disc .pj-h{margin-bottom:10px}.pj-disc .pj-sub{font-size:34px}
+.dc-wrap{display:flex;gap:26px;justify-content:center}
+.dc-must{flex:none;width:520px;display:flex;flex-direction:column;gap:12px}
+.dc-h{font-size:30px;font-weight:900;color:#2E8B57;margin-bottom:4px}
+.dc-m{background:#fff;border:5px solid #2E8B57;border-radius:20px;padding:10px 18px;font-size:28px;font-weight:700;line-height:1.35}
+.dc-start{flex:1;max-width:1150px;background:#fff;border:5px solid #3A86C8;border-radius:22px;padding:16px 28px}
+.dc-start .dc-h{color:#3A86C8}
+.dc-start ul{margin:0;padding-left:34px;font-size:30px;font-weight:700;line-height:1.6}
+.dc-ex{margin-top:10px;background:#fff3c4;border-radius:14px;padding:8px 16px;font-size:26px;font-weight:700}
+/* ===== 學生端：別的國家提醒、採買說明 ===== */
+.not-mine{margin:16px auto;max-width:640px;background:#fff3c4;border:4px solid #FFD23F;border-radius:20px;padding:18px;text-align:center;font-size:26px;font-weight:900}
+.not-mine small{display:block;margin-top:8px;font-size:20px;font-weight:700}
+.shop-guide{background:#e8f3ff;border:3px solid #3A86C8;border-radius:16px;padding:10px 16px;margin:0 0 12px;font-size:19px;line-height:1.5}
+/* ===== ⏱ 倒數計時 ===== */
+.tmr{display:none}
+.tmr.run,.tmr.up{display:block}
+.tmr-badge{display:none;align-items:center;gap:10px;background:#2B2D42;color:#fff;border-radius:18px;padding:6px 16px;box-shadow:0 4px 12px rgba(0,0,0,.25);font-variant-numeric:tabular-nums}
+.tmr.run .tmr-badge{display:inline-flex}
+.tmr-t{font-weight:900;min-width:3.2ch;text-align:right}
+.tmr-bar{display:block;width:90px;height:10px;border-radius:5px;background:rgba(255,255,255,.25);overflow:hidden}
+.tmr-bar em{display:block;height:100%;width:100%;background:#FFD23F;transition:width .25s linear}
+.tmr.warn .tmr-badge{background:#D7263D;animation:tmrpulse 1s infinite}
+@keyframes tmrpulse{50%{transform:scale(1.06)}}
+.tmr-up{display:none}
+.tmr.up .tmr-up{display:flex}
+.tmr-up{align-items:center;justify-content:center;text-align:center;background:#1d2b53;color:#fff}
+.tmr-up h1{margin:0}.tmr-up p{margin:6px 0 0;font-weight:700}
+/* 投影幕：右上角 */
+.pj-stage .tmr{position:absolute;inset:0;pointer-events:none;z-index:20}
+.pj-stage .tmr-badge{position:absolute;right:26px;top:20px;font-size:52px;padding:8px 24px}
+.pj-stage .tmr-bar{width:160px;height:14px}
+.pj-stage .tmr-up{position:absolute;inset:0}
+.pj-stage .tmr-up .big-emoji{font-size:200px}.pj-stage .tmr-up h1{font-size:130px}.pj-stage .tmr-up p{font-size:70px}
+/* 學生平板：右上角（標題列下方） */
+body.student .tmr-badge{position:fixed;right:12px;top:64px;z-index:70;font-size:30px}
+body.student .tmr-up{position:fixed;inset:0;z-index:90}
+body.student .tmr-up .big-emoji{font-size:120px}body.student .tmr-up h1{font-size:64px}body.student .tmr-up p{font-size:40px}
+/* 老師控制台 */
+.tmr-panel{margin-top:12px}
+.tmr-set,.tmr-now{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.tmr-custom{display:inline-flex;align-items:center;gap:6px}.tmr-custom .mini-input{width:70px}
+.tmr.inline{display:inline-block}.tmr.inline .tmr-badge{font-size:24px}
+.pj-vintro{display:flex;flex-direction:column;justify-content:center;padding-bottom:150px}
+
+.pj-disc{display:flex;flex-direction:column;justify-content:center;padding-bottom:140px}.pj-disc .dc-m{font-size:32px;padding:14px 20px}.pj-disc .dc-must{width:560px;gap:16px}.pj-disc .dc-start ul{font-size:36px;line-height:1.65}.pj-disc .dc-ex{font-size:30px}.pj-disc .dc-h{font-size:34px}.dc-warn{margin-top:18px}
+
+body.student .tmr-badge{top:4px;right:8px;font-size:24px;padding:3px 12px;border:2px solid #fff}body.student .tmr-bar{width:70px;height:8px}
