@@ -93,7 +93,7 @@
     $('#pause').classList.toggle('hidden', !S.paused);
     $('#frozen').classList.toggle('hidden', !(S.frozen && S.frozen[N]) || S.paused);
     if (cc) A.setTitleFlagColor(cc);
-    const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)} <button class="tb-leave" data-act="leave">換房間</button></div></div>`;
+    const head = `<div class="topbar"><div class="tb-l">${cc ? A.flag(cc, 'tb-flag') : '🎒'} 第 ${N} 組${cc ? '・' + A.cname(cc) : ''}</div><div class="tb-c">步驟 ${S.step}：${esc(stepInfo().title)}</div><div class="tb-r">房間 ${esc(R)}</div></div>`;
     let body = '';
     const st = S.step, id = A.sid(st), kind = A.stepKind(st);
     if (st !== lastStepSeen) { lastStepSeen = st; noticeAt = {}; }   // 換步驟時，通知的倒數重新計算

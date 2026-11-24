@@ -38,7 +38,7 @@
     const old = hist.filter(h => now - h.createdAt > limit);
     hist = hist.filter(h => now - h.createdAt <= limit);
     lsSet('sgHist', hist);
-    old.forEach(h => DB.remove('rooms/' + h.code).catch(() => {}));
+    old.forEach(h => DB.remove('keys/' + h.code).catch(() => {}).then(() => DB.remove('rooms/' + h.code)).catch(() => {}));
     const cs = createDraft;
     root.innerHTML = `<div class="home">
       <h1>🧭 世界的尺：背包客生存挑戰　<small>教師控制台</small></h1>
@@ -71,13 +71,48 @@
     const ex = await DB.get(`rooms/${code}/state`);
     if (!ex) return A.toast('找不到這個房間（可能已超過保留期限）');
     const hist = lsGet('sgHist', []);
-    if (!hist.find(h => h.code === code)) { const m = await DB.get(`rooms/${code}`); hist.push({ code, createdAt: (m && m.createdAt) || Date.now(), groupCount: ex.groupCount }); lsSet('sgHist', hist); }
+    if (!REMOTE && !hist.find(h => h.code === code)) { const m = await DB.get(`rooms/${code}`); hist.push({ code, createdAt: (m && m.createdAt) || Date.now(), groupCount: ex.groupCount }); lsSet('sgHist', hist); }
     if (unsub) unsub();
     CODE = code; tab = 'ctrl'; M = null;
     unsub = DB.on('rooms/' + code, v => { M = v; if (!v) { A.toast('房間已被刪除'); return showHome(); } renderAll(); });
   }
-  const own = () => M && M.owner === DB.uid;
+  // 可以控制：開這個房間的電腦，或用「平板遙控」連結加入的裝置
+  const own = () => M && (M.owner === DB.uid || !!(M.ctrl && M.ctrl[DB.uid]));
   const ST = (p, v) => own() ? DB.set(`rooms/${CODE}/state/${p}`, v) : (A.toast('這個房間不是用這台電腦／瀏覽器開的，只能檢視'), Promise.resolve());
+
+  /* ---------- 平板遙控 ----------
+     電腦（開房間的那台）產生一組隨機密鑰，做成連結／QR code；平板開這個連結，就能和電腦一樣控制這個房間。
+     密鑰存在 keys/房間代碼（只有開房間的電腦讀得到），Firebase 規則會核對平板帶來的密鑰對不對。 */
+  const QS = new URLSearchParams(location.search);
+  const REMOTE = !!(QS.get('room') && QS.get('ctrl'));   // 這台是用遙控連結打開的
+  const randKey = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), x => 'abcdefghjkmnpqrstuvwxyz23456789'[x % 31]).join('');
+  async function remoteJoin() {
+    const code = QS.get('room'), key = QS.get('ctrl');
+    root.innerHTML = '<div class="center-card"><h1>📱 平板遙控</h1><p class="big-p">連線中…</p></div>';
+    const fail = () => { root.innerHTML = `<div class="center-card"><h1>📲 這個遙控連結不能用了</h1><p class="big-p">可能是老師按了「停止平板遙控」，或房間已刪除。<br>請在電腦的控制台按「📲 平板遙控」，再掃一次新的 QR code。</p></div>`; };
+    try {
+      if (DB.demo && (await DB.get(`keys/${code}/key`)) !== key) return fail();   // 示範模式沒有 Firebase 規則，在這裡自己核對
+      await DB.set(`keys/${code}/ok/${key}/${DB.uid}`, true);
+      await DB.set(`rooms/${code}/ctrl/${DB.uid}`, true);
+    } catch (e) { return fail(); }
+    openRoom(code);
+  }
+  async function showRemoteLink() {
+    let key = await DB.get(`keys/${CODE}/key`).catch(() => null);
+    if (!key) { key = randKey(); await DB.set(`keys/${CODE}`, { key }); }
+    const url = new URL(`teacher.html?room=${CODE}&ctrl=${key}` + (DB.demo ? '&demo=1' : ''), location.href).href;
+    let qr = '';
+    try { const q = qrcode(0, 'M'); q.addData(url); q.make(); qr = q.createSvgTag({ cellSize: 6, margin: 2, scalable: true }); } catch (e) {}
+    const n = Object.keys(M.ctrl || {}).length;
+    const keep = await A.confirm(`<b style="font-size:24px">📱 用平板遙控這個房間</b><br>用平板的相機掃描這個 QR code（不用輸入密碼）：
+      <span class="rc-qr">${qr}</span><span class="rc-url">${esc(url)}</span>
+      這台電腦的控制台、投影視窗請繼續開著；平板和電腦可以同時控制。<br>
+      <small>⚠ 這個連結等於教師權限，不要給學生。${n ? `目前有 ${n} 台平板在遙控。` : ''}</small>`, '關閉', '🔒 停止所有平板遙控');
+    if (keep) return;
+    if (!(await A.confirm('停止後，所有平板都不能再控制這個房間；之後再按「📱 平板遙控」會產生新的 QR code。確定嗎？', '停止遙控'))) return;
+    await DB.remove(`keys/${CODE}`); await DB.remove(`rooms/${CODE}/ctrl`);
+    A.toast('已停止平板遙控');
+  }
   const state = () => M.state;
   const nGroups = () => state().groupCount;
   const gl = () => Array.from({ length: nGroups() }, (_, i) => i + 1);
@@ -124,11 +159,13 @@
         <div class="room-code">房間代碼 <b>${CODE}</b><small>${joinedCount()} / ${nGroups()} 組已加入</small></div></div>
       <div class="tabs"><button class="tab ${tab === 'ctrl' ? 'on' : ''}" data-act="tab" data-t="ctrl">控制台</button><button class="tab ${tab === 'poster' ? 'on' : ''}" data-act="tab" data-t="poster">海報總覽</button></div>
       <button class="btn pausebtn ${s.paused ? 'on' : ''}" data-act="pause">${s.paused ? '▶ 解除暫停' : '👀 全班暫停'}</button>
-      <button class="btn" data-act="projwin" title="開一個只有投影畫面的新視窗，拖到電子白板後按「⛶ 全螢幕」（電腦螢幕設定成「延伸」時使用）">🖥 開啟投影視窗</button>
-      <button class="btn" data-act="proj" title="這個視窗直接切換成投影畫面（電腦螢幕設定成「複製」時使用）">📽 投影模式</button>
+      ${REMOTE ? '' : `<button class="btn" data-act="projwin" title="開一個只有投影畫面的新視窗，拖到電子白板後按「⛶ 全螢幕」（電腦螢幕設定成「延伸」時使用）">🖥 開啟投影視窗</button>
+      <button class="btn" data-act="proj" title="這個視窗直接切換成投影畫面（電腦螢幕設定成「複製」時使用）">📽 投影模式</button>`}
       <button class="btn fsbtn ${s.fs ? 'on' : ''}" data-act="fs" title="學生平板會出現『點一下進入全螢幕』，再按一次關閉">${s.fs ? '📱 平板全螢幕 ✓' : '📱 平板全螢幕'}</button>
-      <button class="btn ghost" data-act="home">← 首頁</button></div>`;
-    if (!own()) h += '<div class="banner">👁 這個房間不是用這台電腦／瀏覽器建立的，只能檢視與匯出海報，無法控制。</div>';
+      ${REMOTE ? '<span class="remote-tag">📲 平板遙控中</span>' : `${M.owner === DB.uid ? `<button class="btn" data-act="remote" title="產生 QR code，用平板掃描後就能拿著平板控制（電腦這邊繼續開著投影）">📲 平板遙控${M.ctrl ? ` <small>(${Object.keys(M.ctrl).length})</small>` : ''}</button>` : ''}
+      <button class="btn ghost" data-act="home">← 首頁</button>`}</div>`;
+    if (REMOTE && !own()) h += '<div class="banner">🔒 老師已停止平板遙控。請在電腦的控制台按「📲 平板遙控」，再掃一次新的 QR code。</div>';
+    else if (!own()) h += '<div class="banner">👁 這個房間不是用這台電腦／瀏覽器建立的，只能檢視與匯出海報，無法控制。</div>';
     if (tab === 'poster') { root.innerHTML = h + posterTabHTML(); mountThumbs(); return; }
     h += '<div class="ctrl-main"><nav class="steplist">' + C.steps.map((x, i) => `<button class="stepbtn ${i === step ? 'on' : ''} ${i < step ? 'past' : ''}" data-act="jump" data-i="${i}"><b>${i}</b> ${esc(x.title)}</button>`).join('') + '</nav>';
     h += `<div class="stepbody"><h2>步驟 ${step}：${esc(C.steps[step].title)}${sid() === 'numberline' ? `　<small>（顯示進度 ${s.sub} / ${maxSub()}）</small>` : ''}${sid() === 'card' ? `　<small>（投影幕：${s.sub ? '世界地圖' : '任務卡'}）</small>` : ''}</h2>
@@ -230,6 +267,8 @@
     const info = `<div class="muted">${esc(v.title || '')}${v.length ? `（${esc(v.length)}）` : ''}</div>`;
     if (v.embed) return `<div class="panel mini vid-panel"><b>🎬 影片遙控</b>（影片在投影畫面播放；控制台預覽不出聲）${info}
       <div class="vid-btns"><button class="btn primary" data-act="vid" data-cmd="play">▶ 播放</button><button class="btn" data-act="vid" data-cmd="pause">⏸ 暫停</button><button class="btn" data-act="vid" data-cmd="restart">⏮ 從頭</button></div></div>`;
+    if (REMOTE) return `<div class="panel mini vid-panel"><b>🎬 影片</b>：這部影片要在<b>電腦</b>上另開 YouTube 視窗播放（平板按了只會在平板上播）。${info}
+      <div class="muted">請到電腦按控制台的「▶ 開啟影片」，或直接點白板上投影畫面中間的影片縮圖。看完關掉視窗，再用平板按「下一步」。</div></div>`;
     return `<div class="panel mini vid-panel"><b>🎬 影片</b>：這部影片不允許嵌入其他網站，請另開 YouTube 視窗播放。${info}
       <div class="vid-btns"><button class="btn primary big" data-act="openvideo" data-v="${esc(sd.video)}">▶ 開啟影片（YouTube 新視窗）</button></div>
       <div class="muted">開啟後把視窗拖到白板、按影片右下角的全螢幕；看完關掉視窗，再按「下一步」。</div></div>`;
@@ -347,6 +386,7 @@
     if (act === 'home') return showHome();
     if (act === 'proj') { projMode = true; renderAll(); try { document.documentElement.requestFullscreen(); } catch (e) {} return; }
     if (act === 'projwin') return openProjector();
+    if (act === 'remote') return showRemoteLink();
     if (act === 'exportAll') return doExport(gl().filter(asg), `世界的尺_房間${CODE}_全部海報.pdf`);
     if (act === 'exportOne') return doExport([+d.n], `第${d.n}組_${A.cname(asg(+d.n))}_海報.pdf`);
     if (!own()) return A.toast('只能檢視，無法控制這個房間');
@@ -382,6 +422,7 @@
 
   /* ---------- 啟動 ---------- */
   DB.ready.then(() => {
+    if (REMOTE) return remoteJoin();   // 平板遙控連結：連結本身就是通行證，不用輸入密碼
     let ok = false; try { ok = sessionStorage.getItem('sgTeacherOk') === '1'; } catch (e) {}
     ok && lsGet('sgPw', null) ? showHome() : showLogin();
   }).catch(err => { root.innerHTML = `<div class="center-card"><h1>連線失敗</h1><p>${esc(err.message || err)}</p></div>`; });

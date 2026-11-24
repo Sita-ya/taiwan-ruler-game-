@@ -92,16 +92,17 @@
       if (sd.kind === 'video') return videoSlide(sd, sl, env, enter);
       if (sd.kind === 'videoSum') return videoSumSlide(sl, enter);
       if (id === 'lobby') {
-        return `<div class="pj pj-lobby ${enter}"><div class="pj-l"><h1>${esc(C.title)}</h1>${subLine(sl.sub)}<img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
+        return `<div class="pj pj-lobby ${enter}"><div class="pj-l"><h1>${esc(C.title)}</h1>${subLine(sl.sub)}${sl.point ? `<div class="pj-recap">${br(sl.point)}</div>` : ''}<img class="lobby-img" src="assets/backpackers.jpg" alt="" onerror="this.remove()">
           <div class="pj-groups">${gl.map(n => `<div class="pj-g ${grp(n).uid ? 'on' : ''}">第 ${n} 組<br><small>${grp(n).uid ? '已加入 ✓' : '等待中'}</small></div>`).join('')}</div></div>
           <div class="pj-r"><div class="pj-codelabel">房間代碼</div><div class="pj-code">${esc(env.code)}</div><div class="pj-qr">${env.qr}</div><div class="pj-url">平板開啟 student.html，輸入代碼<br>或掃描 QR code</div></div></div>`;
       }
       if (id === 'card' && (s.sub || 0) >= 1) return worldMap(gl, asg, sl, enter);
       if (id === 'card') {
-        return `<div class="pj ${enter}"><h1 class="pj-h">各組的國家任務</h1><div class="pj-cards">${gl.map(n => asg(n) ? `<div class="pj-card" style="--cc:${C.countries[asg(n)].color}">${A.postcard(asg(n), 'pj-pc')}<div class="pj-cn">${A.flag(asg(n), 'pj-flag')}<b>${A.cname(asg(n))}</b></div><div class="pj-gn">第 ${n} 組</div></div>` : `<div class="pj-card empty"><div class="big-emoji">❓</div><div class="pj-gn">第 ${n} 組</div></div>`).join('')}</div></div>`;
+        return `<div class="pj pj-cardview ${enter}"><h1 class="pj-h">各組的國家任務</h1>${subLine(sl.sub)}<div class="pj-cards">${gl.map(n => asg(n) ? `<div class="pj-card" style="--cc:${C.countries[asg(n)].color}">${A.postcard(asg(n), 'pj-pc')}<div class="pj-cn">${A.flag(asg(n), 'pj-flag')}<b>${A.cname(asg(n))}</b></div><div class="pj-gn">第 ${n} 組</div></div>` : `<div class="pj-card empty"><div class="big-emoji">❓</div><div class="pj-gn">第 ${n} 組</div></div>`).join('')}</div>${sl.say ? `<div class="pj-say">💬 ${br(sl.say)}</div>` : ''}</div>`;
       }
       if (id === 'search') {
-        return `<div class="pj ${enter}"><h1 class="pj-h">${esc(sd.title)}</h1>${subLine(sl.sub)}
+        const steps = (sl.points || []).length ? `<div class="pj-howto">${sl.points.map((p, i) => `<div class="ht-step"><b>${i + 1}</b><span>${br(p)}</span></div>`).join('')}</div>${sl.point ? `<div class="pj-warn">⚠ ${br(sl.point)}</div>` : ''}` : '';
+        return `<div class="pj pj-search ${enter}"><h1 class="pj-h">${esc(sd.title)}</h1>${subLine(sl.sub)}${steps}
           <div class="pj-status">${gl.map(n => { const st = A.status(step, grp(n)), cc = asg(n); return `<div class="pj-s ${st}" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'pj-flag') : ''}<b>第 ${n} 組</b><span>${cc ? A.cname(cc) : ''}</span><em>${A.statusLabel[st]}</em></div>`; }).join('')}</div>${askBar(sl.ask)}</div>`;
       }
       if (id === 'round1' || id === 'store' || id === 'round2') return collection(gl, grp, asg, id, sl, enter);
@@ -109,7 +110,8 @@
       // poster
       return `<div class="pj pj-poster ${enter}"><h1 class="pj-h">比較海報完成！</h1>${subLine(sl.sub)}
         <div class="pj-chips">${gl.map(n => { const cc = asg(n); return `<div class="pj-chip" ${cc ? `style="--cc:${C.countries[cc].color}"` : ''}>${cc ? A.flag(cc, 'chip-flag') : ''}第 ${n} 組 ${cc ? A.cname(cc) : ''} 📄</div>`; }).join('')}</div>
-        <div class="pj-box"><div class="pj-box-h">海報上要有：</div>${pointsBox(sl.points, sl.point)}</div>
+        <div class="pj-boxes"><div class="pj-box"><div class="pj-box-h">📄 海報上要有：</div>${pointsBox(sl.points, sl.point)}${sl.example ? `<div class="pj-example">${br(sl.example)}</div>` : ''}</div>
+        ${(sl.next || []).length ? `<div class="pj-box pj-nextbox"><div class="pj-box-h">🔑 下一節發表的通關密碼</div><ol>${sl.next.map(x => `<li>${br(x)}</li>`).join('')}</ol></div>` : ''}</div>
         <p class="pj-note">下一節課要正式發表，請貼上手寫的「我的大發現」。</p>${askBar(sl.ask)}</div>`;
     }
   };
@@ -182,7 +184,7 @@
       }
       return `<div class="cl-card" style="--cc:${c.color}"><div class="cl-head">${A.flag(cc, 'cl-flag')}<b>第 ${n} 組・${c.name}</b><span>預算 ${fmt(budget)} 元</span></div>${inner}</div>`;
     }).join('');
-    return `<div class="pj cl ${enter} ${sl.ask ? 'has-ask' : ''}"><h1 class="pj-h cl-h">${title}</h1><div class="cl-grid ${list.length <= 4 ? 'two' : ''}">${cards}</div>${askBar(sl.ask)}</div>`;
+    return `<div class="pj cl ${enter} ${sl.ask ? 'has-ask' : ''}"><h1 class="pj-h cl-h">${title}</h1>${sl.sub ? `<div class="cl-sub">${br(sl.sub)}</div>` : ''}<div class="cl-grid ${list.length <= 4 ? 'two' : ''}">${cards}</div>${askBar(sl.ask)}</div>`;
   }
 
   /* 上台發表：把某一組的明細表放大 */
@@ -220,7 +222,8 @@
     });
     h += `<div class="nl-wb ${sub >= k + 1 ? 'in' : ''} ${fresh(k + 1)}" style="left:${pos(C.wbLineTWD)}%"><span>世界銀行：每天 3 美元 ≈ ${C.wbLineTWD} 元</span></div></div>
       <div class="nl-note">數線前段放大（越往右，每一格代表的金額越大），標籤寫的是實際金額</div>
-      <div class="nl-q ${sub >= k + 2 ? 'in' : ''} ${fresh(k + 2)}">為什麼日本、美國的貧窮線比肯亞高好幾倍，在當地生活的人依然很辛苦？</div></div>`;
+      <div class="nl-q ${sub >= k + 2 ? 'in' : ''} ${fresh(k + 2)}">為什麼日本、美國的貧窮線比肯亞高好幾倍，在當地生活的人依然很辛苦？</div>
+      ${A.SL('numberline').close ? `<div class="nl-close ${sub >= k + 3 ? 'in' : ''} ${fresh(k + 3)}">💡 ${br(A.SL('numberline').close)}</div>` : ''}</div>`;
     return h;
   }
 
